@@ -1,10 +1,9 @@
+import csv
 from pathlib import Path
-from more_itertools import consecutive_groups
 
 import cv2 as cv
 import numpy as np
-
-import csv
+from more_itertools import consecutive_groups
 
 # TODO: handle it xd
 train_notes_list = ["c_a", "c_ais", "c_b", "c_h", "c_c1", "c_cis1", "c_des1", "c_d1", "c_dis1", "c_es1", "c_e1", "c_f1",
@@ -346,45 +345,46 @@ if __name__ == '__main__':
     file_ext = '.jpg'
 
     """Crops all training data sheets"""
-    raw_sheets_path = r'C:\Users\Radek\PycharmProjects\omr\raw_sheets'
-    cropped_sheets_path = r'C:\Users\Radek\PycharmProjects\omr\cropped_sheets'
+    raw_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\raw_sheets'
+    cropped_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\cropped_sheets'
     # crop_all_sheets(raw_sheets_path, cropped_sheets_path, file_ext)
 
     """Preprocess sheets before extracting notes from trainig data sheets"""
-    preprocessed_sheets_path = r'C:\Users\Radek\PycharmProjects\omr\preprocessed_sheets'
+    preprocessed_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\preprocessed_sheets'
     page_height = 1600
     page_margin = 40
-    # preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, file_ext)
+    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, file_ext)
 
     """Crop out staffs from preprocessed sheets"""
-    staffs_path = r'C:\Users\Radek\PycharmProjects\omr\staffs'
-    staff_margin = 5
+    # staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\staffs'
+    # staff_margin = 5
     # crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, file_ext)
 
     """Crop notes by vertical tact lines"""
-    notes_path = r'C:\Users\Radek\PycharmProjects\omr\notes'
-    height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
-    each_note_copies = 20  # ile jest nutek danego rodzaju
+    # notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
+    # height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
+    # each_note_copies = 20  # ile jest nutek danego rodzaju
     # crop_notes(height_divider, each_note_copies, staffs_path, notes_path, file_ext)
 
     """Compute descriptor for every note"""
-    descriptors_path = r'C:\Users\Radek\PycharmProjects\omr\descriptors'
-    file_ext_in = file_ext
-    file_ext_out = '.npy'
-    resize_up_factor = None
+    # descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
+    # file_ext_in = file_ext
+    # file_ext_out = '.npy'
+    # resize_up_factor = None
     # init_descriptors('sift', resize_up_factor, notes_path, descriptors_path, file_ext_in, file_ext_out)
 
     """Get statistics FMR and FNMR to plot ROC curve and find threshold that corresponds to EER"""
-    note_copies_count = 20  # ile kopii nutek wziac do obliczen
-    match_count_threshold = list(range(1, 26, 1))
-    similarity_score_threshold = np.arange(0.3, 0.9, 0.05)
-    get_statistics_to_csv(match_count_threshold, similarity_score_threshold, note_copies_count, descriptors_path + r'\sift')
+    # note_copies_count = 20  # ile kopii nutek wziac do obliczen
+    # match_count_threshold = list(range(1, 26, 1))
+    # similarity_score_threshold = np.arange(0.3, 0.9, 0.05)
+    # get_statistics_to_csv(match_count_threshold, similarity_score_threshold, note_copies_count,
+    #                       descriptors_path + r'\sift')
 
     """Test if work"""
-    # user_input_path = r'C:\Users\Radek\PycharmProjects\omr\user_input'
-    # user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr\user_cropped'
+    # user_input_path = r'C:\Users\Radek\PycharmProjects\omr2\user_input'
+    # user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr2\user_cropped'
     # crop_all_sheets(user_input_path, user_cropped_path, file_ext)
-    # user_processed_path = r'C:\Users\Radek\PycharmProjects\omr\user_processed'
+    # user_processed_path = r'C:\Users\Radek\PycharmProjects\omr2\user_processed'
     # preprocess_sheets(page_height, page_margin, user_cropped_path, user_processed_path, file_ext)
-    # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr\user_staffs'
+    # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
     # crop_staffs(staff_margin, user_processed_path, user_staffs_path, file_ext)
