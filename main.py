@@ -5,7 +5,6 @@ import cv2 as cv
 import numpy as np
 from more_itertools import consecutive_groups
 
-# TODO: handle it xd
 train_notes_list = ["c_a", "c_ais", "c_b", "c_h", "c_c1", "c_cis1", "c_des1", "c_d1", "c_dis1", "c_es1", "c_e1", "c_f1",
                     "c_fis1", "c_ges1", "c_g1",
                     "c_gis1", "c_as1", "c_a1", "c_ais1", "c_b1", "c_h1", "c_c2", "c_cis2", "c_des2", "c_d2", "c_dis2",
@@ -175,7 +174,7 @@ def crop_staffs(target_margin, path_in, path_out, ext):
             threshed = cv.threshold(staff, 127, 255, cv.THRESH_BINARY)[1]
             x, y, w, h = cv.boundingRect(threshed)
             key_margin = 55
-            cropped = staff[y:y + h, x+key_margin:x + w]
+            cropped = staff[y:y + h, x + key_margin:x + w]
             cv.imwrite(str(output_path / (file.stem + '_' + str(i).zfill(2) + ext)), cropped)
 
 
@@ -192,35 +191,51 @@ def crop_notes(divider_param, max_notes, path_in, path_out, ext):
     current_note = 0
     for file in input_path.glob('*' + ext):
         staff = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
+        # TODO: dopisac komenty ze threshold po to zeby artefakty kompresji jpg usunac (lub wgl zmienic na png)
+        staff = cv.threshold(staff, 127, 255, cv.THRESH_BINARY)[1]
 
-        # wykryj pionowe linie za pomoca operacji morficznych uzaleznionych od wysokosci
         # https://docs.opencv.org/3.4/dd/dd7/tutorial_morph_lines_detection.html
+        # wykryj poziome linie zeby wiedziec odkad zaczac zliczac piksele
+        width = staff.shape[0]
+        horizontal_size = round(width / divider_param)
+        kernel_horizontal = (horizontal_size + 5, 1)
+        horizontal_structure = cv.getStructuringElement(cv.MORPH_RECT, kernel_horizontal)
+        staff_horizontal = cv.erode(staff, horizontal_structure)
+        staff_horizontal = cv.dilate(staff_horizontal, horizontal_structure)
+
+        cv.imshow('staff_h', staff_horizontal)
+        cv.waitKey()
+
+        sum_horizontal = np.sum(staff_horizontal, axis=1).astype(np.float32)
+        dilated_h = cv.dilate(sum_horizontal, np.ones((3, 3), np.uint8))
+        line_indices = np.where(dilated_h > np.std(dilated_h) * 2.05)[0]
+        # TODO: pobawic sie tymi nutkami (przycinanie pieciolinii perfekto juz jest)
+        # wykryj pionowe linie za pomoca operacji morficznych uzaleznionych od wysokosci
         height = staff.shape[1]
-
         vertical_size = round(height / divider_param)
+        kernel_vertical = (1, vertical_size)
+        vertical_structure = cv.getStructuringElement(cv.MORPH_RECT, kernel_vertical)
+        staff_vertical = cv.erode(staff, vertical_structure)
+        staff_vertical = cv.dilate(staff_vertical, vertical_structure)
+        # przycinamy do granic pieciolinii
+        dilation_bias = 0
+        cropped = staff[line_indices[0] - dilation_bias:line_indices[-1]]
 
-        kernel_size = (1, vertical_size)
+        cv.imshow('cropped', cropped)
+        cv.waitKey()
 
-        vertical_structure = cv.getStructuringElement(cv.MORPH_RECT, kernel_size)
+        if cropped.shape[0] < 40:
+            print('xd')
 
-        eroded = cv.erode(staff, vertical_structure)
-        dilated = cv.dilate(eroded, vertical_structure)
-
-        thinned = cv.ximgproc.thinning(dilated, thinningType=cv.ximgproc.THINNING_GUOHALL)
-        #
-        # cv.imshow('thinned', thinned)
-        # cv.waitKey()
-
-        sum_pixels = np.sum(thinned, axis=0)
-        tact_indices = np.where(sum_pixels > 4500)[0]
+        sum_vertical = np.sum(cropped, axis=0).astype(np.float32)
+        dilated_v = cv.dilate(sum_vertical, np.ones((3, 3), np.uint8))
+        tact_indices = np.where(dilated_v > 9000)[0]
         tact_margin = 2
         last_idx = 0
         for i in range(0, len(tact_indices)):
-            if abs((last_idx + tact_margin) - (tact_indices[i] - tact_margin)) > 5:
+            if abs((last_idx + tact_margin) - (tact_indices[i] - tact_margin)) > 30:
                 note = staff[:, last_idx + tact_margin:tact_indices[i] - tact_margin]
                 last_idx = tact_indices[i]
-                # TODO: w nazwie juz podaj wartosc nutki i index, ez (w pliku script jest kolejnosc nut)
-                # TODO: tutaj resize przed zapisem??
                 cv.imwrite(
                     str(output_path /
                         (file.stem[2] + '_' + train_notes_list[current_note][2:] + '_' + str(note_count).zfill(2) + ext)
@@ -372,17 +387,17 @@ if __name__ == '__main__':
     preprocessed_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\preprocessed_sheets'
     page_height = 1600
     page_margin = 40
-    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, file_ext)
+    # preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, file_ext)
 
     """Crop out staffs from preprocessed sheets"""
-    # staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\staffs'
-    # staff_margin = 5
+    staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\staffs'
+    staff_margin = 5
     # crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, file_ext)
 
     """Crop notes by vertical tact lines"""
-    # notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
-    # height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
-    # each_note_copies = 20  # ile jest nutek danego rodzaju
+    notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
+    height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
+    each_note_copies = 20  # ile jest nutek danego rodzaju
     # crop_notes(height_divider, each_note_copies, staffs_path, notes_path, file_ext)
 
     """Compute descriptor for every note"""
