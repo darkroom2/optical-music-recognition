@@ -10,7 +10,22 @@ train_notes_list = ["c_a", "c_ais", "c_b", "c_h", "c_c1", "c_cis1", "c_des1", "c
                     "c_fis1", "c_ges1", "c_g1",
                     "c_gis1", "c_as1", "c_a1", "c_ais1", "c_b1", "c_h1", "c_c2", "c_cis2", "c_des2", "c_d2", "c_dis2",
                     "c_es2", "c_e2", "c_f2",
-                    "c_fis2", "c_ges2", "c_g2", "c_gis2", "c_as2", "c_a2", "c_ais2", "c_b2", "c_h2", "c_c3"]
+                    "c_fis2", "c_ges2", "c_g2", "c_gis2", "c_as2", "c_a2", "c_ais2", "c_b2", "c_h2", "c_c3",
+                    "o_a", "o_ais", "o_b", "o_h", "o_c1", "o_cis1", "o_des1", "o_d1", "o_dis1", "o_es1", "o_e1", "o_f1",
+                    "o_fis1", "o_ges1", "o_g1",
+                    "o_gis1", "o_as1", "o_a1", "o_ais1", "o_b1", "o_h1", "o_c2", "o_cis2", "o_des2", "o_d2", "o_dis2",
+                    "o_es2", "o_e2", "o_f2",
+                    "o_fis2", "o_ges2", "o_g2", "o_gis2", "o_as2", "o_a2", "o_ais2", "o_b2", "o_h2", "o_c3",
+                    "p_a", "p_ais", "p_b", "p_h", "p_c1", "p_cis1", "p_des1", "p_d1", "p_dis1", "p_es1", "p_e1", "p_f1",
+                    "p_fis1", "p_ges1", "p_g1",
+                    "p_gis1", "p_as1", "p_a1", "p_ais1", "p_b1", "p_h1", "p_c2", "p_cis2", "p_des2", "p_d2", "p_dis2",
+                    "p_es2", "p_e2", "p_f2",
+                    "p_fis2", "p_ges2", "p_g2", "p_gis2", "p_as2", "p_a2", "p_ais2", "p_b2", "p_h2", "p_c3",
+                    "w_a", "w_ais", "w_b", "w_h", "w_c1", "w_cis1", "w_des1", "w_d1", "w_dis1", "w_es1", "w_e1", "w_f1",
+                    "w_fis1", "w_ges1", "w_g1",
+                    "w_gis1", "w_as1", "w_a1", "w_ais1", "w_b1", "w_h1", "w_c2", "w_cis2", "w_des2", "w_d2", "w_dis2",
+                    "w_es2", "w_e2", "w_f2",
+                    "w_fis2", "w_ges2", "w_g2", "w_gis2", "w_as2", "w_a2", "w_ais2", "w_b2", "w_h2", "w_c3"]
 
 
 def distance(point1, point2):
@@ -157,7 +172,11 @@ def crop_staffs(target_margin, path_in, path_out, ext):
 
         for i, staff_range in enumerate(valid_ranges):
             staff = preprocessed_sheet[staff_range[0] - target_margin:staff_range[-1] + target_margin, :]
-            cv.imwrite(str(output_path / (file.stem + '_' + str(i).zfill(2) + ext)), staff)
+            threshed = cv.threshold(staff, 127, 255, cv.THRESH_BINARY)[1]
+            x, y, w, h = cv.boundingRect(threshed)
+            key_margin = 55
+            cropped = staff[y:y + h, x+key_margin:x + w]
+            cv.imwrite(str(output_path / (file.stem + '_' + str(i).zfill(2) + ext)), cropped)
 
 
 def crop_notes(divider_param, max_notes, path_in, path_out, ext):
