@@ -203,12 +203,10 @@ def crop_notes(divider_param, max_notes, path_in, path_out, ext):
         staff_horizontal = cv.erode(staff, horizontal_structure)
         staff_horizontal = cv.dilate(staff_horizontal, horizontal_structure)
 
-        cv.imshow('staff_h', staff_horizontal)
-        cv.waitKey()
-
         sum_horizontal = np.sum(staff_horizontal, axis=1).astype(np.float32)
         dilated_h = cv.dilate(sum_horizontal, np.ones((3, 3), np.uint8))
-        line_indices = np.where(dilated_h > np.std(dilated_h) * 2.05)[0]
+        line_indices = np.where(dilated_h > np.std(dilated_h) * 2)[0]
+
         # TODO: pobawic sie tymi nutkami (przycinanie pieciolinii perfekto juz jest)
         # wykryj pionowe linie za pomoca operacji morficznych uzaleznionych od wysokosci
         height = staff.shape[1]
@@ -217,25 +215,31 @@ def crop_notes(divider_param, max_notes, path_in, path_out, ext):
         vertical_structure = cv.getStructuringElement(cv.MORPH_RECT, kernel_vertical)
         staff_vertical = cv.erode(staff, vertical_structure)
         staff_vertical = cv.dilate(staff_vertical, vertical_structure)
-        # przycinamy do granic pieciolinii
-        dilation_bias = 0
-        cropped = staff[line_indices[0] - dilation_bias:line_indices[-1]]
 
-        cv.imshow('cropped', cropped)
-        cv.waitKey()
-
-        if cropped.shape[0] < 40:
-            print('xd')
+        cropped = staff_vertical[line_indices[0] - 5:line_indices[-1]+5]
 
         sum_vertical = np.sum(cropped, axis=0).astype(np.float32)
         dilated_v = cv.dilate(sum_vertical, np.ones((3, 3), np.uint8))
-        tact_indices = np.where(dilated_v > 9000)[0]
-        tact_margin = 2
+
+        dilated_v[dilated_v == 0] = np.nan
+
+        tact_indices = np.where(dilated_v > (np.nanmean(dilated_v) - np.nanstd(dilated_v)*-0.21))[0]
+        tact_margin = 4
         last_idx = 0
         for i in range(0, len(tact_indices)):
-            if abs((last_idx + tact_margin) - (tact_indices[i] - tact_margin)) > 30:
+            if abs((last_idx + tact_margin) - (tact_indices[i] - tact_margin)) > 25:
+
                 note = staff[:, last_idx + tact_margin:tact_indices[i] - tact_margin]
                 last_idx = tact_indices[i]
+
+                if note.shape[1] > 50:
+                    note = note[:, 0:40]
+
+                # if 'ais' == (train_notes_list[current_note][2:]):
+                #     cv.imshow(str(file), staff_vertical)
+                #     cv.imshow('note', note)
+                #     cv.waitKey()
+
                 cv.imwrite(
                     str(output_path /
                         (file.stem[2] + '_' + train_notes_list[current_note][2:] + '_' + str(note_count).zfill(2) + ext)
@@ -398,7 +402,7 @@ if __name__ == '__main__':
     notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
     height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
     each_note_copies = 20  # ile jest nutek danego rodzaju
-    # crop_notes(height_divider, each_note_copies, staffs_path, notes_path, file_ext)
+    crop_notes(height_divider, each_note_copies, staffs_path, notes_path, file_ext)
 
     """Compute descriptor for every note"""
     # descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
