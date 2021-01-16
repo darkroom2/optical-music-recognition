@@ -1,30 +1,10 @@
 import csv
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 import cv2 as cv
 import numpy as np
 from more_itertools import consecutive_groups
-
-train_notes_list = ["c_a", "c_ais", "c_b", "c_h", "c_c1", "c_cis1", "c_des1", "c_d1", "c_dis1", "c_es1", "c_e1", "c_f1",
-                    "c_fis1", "c_ges1", "c_g1",
-                    "c_gis1", "c_as1", "c_a1", "c_ais1", "c_b1", "c_h1", "c_c2", "c_cis2", "c_des2", "c_d2", "c_dis2",
-                    "c_es2", "c_e2", "c_f2",
-                    "c_fis2", "c_ges2", "c_g2", "c_gis2", "c_as2", "c_a2", "c_ais2", "c_b2", "c_h2", "c_c3",
-                    "o_a", "o_ais", "o_b", "o_h", "o_c1", "o_cis1", "o_des1", "o_d1", "o_dis1", "o_es1", "o_e1", "o_f1",
-                    "o_fis1", "o_ges1", "o_g1",
-                    "o_gis1", "o_as1", "o_a1", "o_ais1", "o_b1", "o_h1", "o_c2", "o_cis2", "o_des2", "o_d2", "o_dis2",
-                    "o_es2", "o_e2", "o_f2",
-                    "o_fis2", "o_ges2", "o_g2", "o_gis2", "o_as2", "o_a2", "o_ais2", "o_b2", "o_h2", "o_c3",
-                    "p_a", "p_ais", "p_b", "p_h", "p_c1", "p_cis1", "p_des1", "p_d1", "p_dis1", "p_es1", "p_e1", "p_f1",
-                    "p_fis1", "p_ges1", "p_g1",
-                    "p_gis1", "p_as1", "p_a1", "p_ais1", "p_b1", "p_h1", "p_c2", "p_cis2", "p_des2", "p_d2", "p_dis2",
-                    "p_es2", "p_e2", "p_f2",
-                    "p_fis2", "p_ges2", "p_g2", "p_gis2", "p_as2", "p_a2", "p_ais2", "p_b2", "p_h2", "p_c3",
-                    "w_a", "w_ais", "w_b", "w_h", "w_c1", "w_cis1", "w_des1", "w_d1", "w_dis1", "w_es1", "w_e1", "w_f1",
-                    "w_fis1", "w_ges1", "w_g1",
-                    "w_gis1", "w_as1", "w_a1", "w_ais1", "w_b1", "w_h1", "w_c2", "w_cis2", "w_des2", "w_d2", "w_dis2",
-                    "w_es2", "w_e2", "w_f2",
-                    "w_fis2", "w_ges2", "w_g2", "w_gis2", "w_as2", "w_a2", "w_ais2", "w_b2", "w_h2", "w_c3"]
 
 
 def distance(point1, point2):
@@ -173,12 +153,14 @@ def crop_staffs(target_margin, path_in, path_out, ext):
             staff = preprocessed_sheet[staff_range[0] - target_margin:staff_range[-1] + target_margin, :]
             threshed = cv.threshold(staff, 127, 255, cv.THRESH_BINARY)[1]
             x, y, w, h = cv.boundingRect(threshed)
-            key_margin = 55
-            cropped = staff[y:y + h, x + key_margin:x + w]
-            cv.imwrite(str(output_path / (file.stem + '_' + str(i).zfill(2) + ext)), cropped)
+            key_margin = 60
+            key_cropped = threshed[y:y + h, x + key_margin:x + w]
+            x, y, w, h = cv.boundingRect(key_cropped)
+            bound_cropped = key_cropped[y:y + h, x:x + w]
+            cv.imwrite(str(output_path / (file.stem + '_' + str(i).zfill(2) + ext)), bound_cropped)
 
 
-def crop_notes(divider_param, max_notes, path_in, path_out, ext):
+def crop_notes(divider_param, max_notes, train_notes_list, path_in, path_out, ext):
     input_path = Path(path_in)
     if input_path.is_dir() is not True:
         raise Exception('input_path should exist, bad input')
@@ -216,14 +198,14 @@ def crop_notes(divider_param, max_notes, path_in, path_out, ext):
         staff_vertical = cv.erode(staff, vertical_structure)
         staff_vertical = cv.dilate(staff_vertical, vertical_structure)
 
-        cropped = staff_vertical[line_indices[0] - 5:line_indices[-1]+5]
+        cropped = staff_vertical[line_indices[0] - 5:line_indices[-1] + 5]
 
         sum_vertical = np.sum(cropped, axis=0).astype(np.float32)
         dilated_v = cv.dilate(sum_vertical, np.ones((3, 3), np.uint8))
 
         dilated_v[dilated_v == 0] = np.nan
 
-        tact_indices = np.where(dilated_v > (np.nanmean(dilated_v) - np.nanstd(dilated_v)*-0.21))[0]
+        tact_indices = np.where(dilated_v > (np.nanmean(dilated_v) - np.nanstd(dilated_v) * 3))[0]
         tact_margin = 4
         last_idx = 0
         for i in range(0, len(tact_indices)):
@@ -273,9 +255,12 @@ def init_descriptors(method, scale, path_in, path_out, ext_in, ext_out):
 
     for file in input_path.glob('*' + ext_in):
         note = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
-        threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY)[1]
+        threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY_INV)[1]
         if scale is not None:
             threshed = cv.resize(threshed, None, fx=scale, fy=scale, interpolation=cv.INTER_CUBIC)
+
+        cv.imshow('threshed', threshed)
+        cv.waitKey()
 
         note_descriptor = det.detectAndCompute(threshed, None)[1]
 
@@ -340,7 +325,7 @@ def get_fnmr_value(threshold_matches, threshold_similarity, all_notes):
     return (sum_pairs - sum_matches) / sum_pairs
 
 
-def get_statistics_to_csv(thresholds_matches, thresholds_similarities, copies_count, path_in):
+def get_statistics_to_csv(thresholds_matches, thresholds_similarities, copies_count, train_notes_list, path_in):
     input_path = Path(path_in)
     if input_path.is_dir() is not True:
         raise Exception('input_path should exist, bad input')
@@ -362,7 +347,6 @@ def get_statistics_to_csv(thresholds_matches, thresholds_similarities, copies_co
             writer = csv.writer(file)
             writer.writerow(['Threshold', 'FMR', 'FNMR'])
             for thr_match in thresholds_matches:
-                # TODO: dodac do nazwy nutki przedrostek c_, p_ etc.
                 _fmr = get_fmr_value(thr_match, thr_similarity, all_notes_filtered, train_notes_list)
                 _fnmr = get_fnmr_value(thr_match, thr_similarity, all_notes_filtered)
                 writer.writerow([thr_match, _fmr, _fnmr])
@@ -378,51 +362,194 @@ class NoteDetails:
         return self.name + '_' + str(self.id)
 
 
-if __name__ == '__main__':
-    # Photo extension
-    file_ext = '.jpg'
+def prepare_train_notes(train_notes_list, path_in, path_out, ext):
+    """ Function preprocess raw training notes photos and cuts them to individual notes """
 
-    """Crops all training data sheets"""
-    raw_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\raw_sheets'
+    """Crop all training data sheets"""
     cropped_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\cropped_sheets'
-    # crop_all_sheets(raw_sheets_path, cropped_sheets_path, file_ext)
+    crop_all_sheets(path_in, cropped_sheets_path, ext)
 
     """Preprocess sheets before extracting notes from trainig data sheets"""
     preprocessed_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\preprocessed_sheets'
     page_height = 1600
     page_margin = 40
-    # preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, file_ext)
+    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
 
     """Crop out staffs from preprocessed sheets"""
     staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\staffs'
     staff_margin = 5
-    # crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, file_ext)
+    crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
 
     """Crop notes by vertical tact lines"""
-    notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
     height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
     each_note_copies = 20  # ile jest nutek danego rodzaju
-    crop_notes(height_divider, each_note_copies, staffs_path, notes_path, file_ext)
+    # crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, path_out, ext)
 
+
+def stats(train_notes_list, notes_path, descriptors_path, ext_in):
     """Compute descriptor for every note"""
-    # descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
-    # file_ext_in = file_ext
-    # file_ext_out = '.npy'
-    # resize_up_factor = None
-    # init_descriptors('sift', resize_up_factor, notes_path, descriptors_path, file_ext_in, file_ext_out)
+    ext_out = '.npy'
+    resize_up_factor = None
+    init_descriptors('sift', resize_up_factor, notes_path, descriptors_path, ext_in, ext_out)
 
     """Get statistics FMR and FNMR to plot ROC curve and find threshold that corresponds to EER"""
-    # note_copies_count = 20  # ile kopii nutek wziac do obliczen
-    # match_count_threshold = list(range(1, 26, 1))
-    # similarity_score_threshold = np.arange(0.3, 0.9, 0.05)
-    # get_statistics_to_csv(match_count_threshold, similarity_score_threshold, note_copies_count,
-    #                       descriptors_path + r'\sift')
+    note_copies_count = 20  # ile kopii nutek wziac do obliczen
+    match_count_thresh = list(range(1, 26, 1))
+    similarity_score_thresh = np.arange(0.3, 0.9, 0.05)
+    get_statistics_to_csv(match_count_thresh, similarity_score_thresh, note_copies_count, train_notes_list,
+                          descriptors_path + r'\sift')
 
     """Test if work"""
-    # user_input_path = r'C:\Users\Radek\PycharmProjects\omr2\user_input'
+    # user_input_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
     # user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr2\user_cropped'
     # crop_all_sheets(user_input_path, user_cropped_path, file_ext)
     # user_processed_path = r'C:\Users\Radek\PycharmProjects\omr2\user_processed'
     # preprocess_sheets(page_height, page_margin, user_cropped_path, user_processed_path, file_ext)
     # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
     # crop_staffs(staff_margin, user_processed_path, user_staffs_path, file_ext)
+
+
+def user(user_raw_path, user_staffs_path, ext):
+    """Crop all user sheets"""
+    user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr2\user_cropped'
+    crop_all_sheets(user_raw_path, user_cropped_path, ext)
+
+    """Preprocess sheets before extracting staffs from user data sheets"""
+    user_preprocessed_path = r'C:\Users\Radek\PycharmProjects\omr2\user_preprocessed'
+    page_height = 1600
+    page_margin = 40
+    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
+
+    """Crop out staffs from preprocessed sheets"""
+    staff_margin = 5
+    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
+
+
+def test(user_staffs_path, notes_path, ext):
+    img1 = cv.imread(notes_path + r'\p_a1_00' + ext, cv.IMREAD_GRAYSCALE)
+    img1 = cv.threshold(img1, 127, 255, cv.THRESH_BINARY_INV)[1]
+    img2 = cv.imread(user_staffs_path + r'\a_03' + ext, cv.IMREAD_GRAYSCALE)
+    img2 = cv.threshold(img2, 127, 255, cv.THRESH_BINARY_INV)[1]
+
+    cv.imshow('img1', img1)
+    cv.imshow('img2', img2)
+    cv.waitKey()
+
+    feature_name = 'orb'
+
+    detector, matcher = init_feature(feature_name)
+
+    if detector is None:
+        print('unknown feature:', feature_name)
+        exit(1)
+
+    print('using', feature_name)
+
+    kp1, desc1 = detector.detectAndCompute(img1, None)
+    kp2, desc2 = detector.detectAndCompute(img2, None)
+
+    raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)  # 2
+
+    good = []
+    for m, n in raw_matches:
+        if m.distance < 0.7 * n.distance:
+            good.append(m)
+
+    draw_params = dict(matchColor=(0, 255, 0),  # draw matches in green color
+                       singlePointColor=None,
+                       matchesMask=None,  # draw only inliers
+                       flags=2)
+    img3 = cv.drawMatches(img1, kp1, img2, kp2, good, None, **draw_params)
+    cv.imshow('matches', img3)
+    cv.waitKey()
+
+def filter_matches(kp1, kp2, matches, ratio=0.75):
+    mkp1, mkp2 = [], []
+    for m in matches:
+        if len(m) == 2 and m[0].distance < m[1].distance * ratio:
+            m = m[0]
+            mkp1.append(kp1[m.queryIdx])
+            mkp2.append(kp2[m.trainIdx])
+    p1 = np.float32([kp.pt for kp in mkp1])
+    p2 = np.float32([kp.pt for kp in mkp2])
+    kp_pairs = zip(mkp1, mkp2)
+    return p1, p2, list(kp_pairs)
+
+
+def init_feature(name):
+    chunks = name.split('-')
+    if chunks[0] == 'sift':
+        detector = cv.SIFT_create()
+        norm = cv.NORM_L2
+    elif chunks[0] == 'surf':
+        detector = cv.xfeatures2d.SURF_create(800)
+        norm = cv.NORM_L2
+    elif chunks[0] == 'orb':
+        detector = cv.ORB_create(400)
+        norm = cv.NORM_HAMMING
+    elif chunks[0] == 'akaze':
+        detector = cv.AKAZE_create()
+        norm = cv.NORM_HAMMING
+    elif chunks[0] == 'brisk':
+        detector = cv.BRISK_create()
+        norm = cv.NORM_HAMMING
+    else:
+        return None, None
+    if 'flann' in chunks:
+        if norm == cv.NORM_L2:
+            flann_params = dict(algorithm=1, trees=5)
+        else:
+            flann_params = dict(algorithm=6,
+                                table_number=6,  # 12
+                                key_size=12,  # 20
+                                multi_probe_level=1)  # 2
+        matcher = cv.FlannBasedMatcher(flann_params, {})  # bug : need to pass empty dict (#1329)
+    else:
+        matcher = cv.BFMatcher(norm)
+    return detector, matcher
+
+
+def main():
+    # List of notes included in train data
+    train_notes_list = ['c_a', 'c_ais', 'c_b', 'c_h', 'c_c1', 'c_cis1', 'c_des1', 'c_d1', 'c_dis1', 'c_es1', 'c_e1',
+                        'c_f1', 'c_fis1', 'c_ges1', 'c_g1', 'c_gis1', 'c_as1', 'c_a1', 'c_ais1', 'c_b1', 'c_h1', 'c_c2',
+                        'c_cis2', 'c_des2', 'c_d2', 'c_dis2', 'c_es2', 'c_e2', 'c_f2', 'c_fis2', 'c_ges2', 'c_g2',
+                        'c_gis2', 'c_as2', 'c_a2', 'c_ais2', 'c_b2', 'c_h2', 'c_c3', 'o_a', 'o_ais', 'o_b', 'o_h',
+                        'o_c1', 'o_cis1', 'o_des1', 'o_d1', 'o_dis1', 'o_es1', 'o_e1', 'o_f1', 'o_fis1', 'o_ges1',
+                        'o_g1', 'o_gis1', 'o_as1', 'o_a1', 'o_ais1', 'o_b1', 'o_h1', 'o_c2', 'o_cis2', 'o_des2', 'o_d2',
+                        'o_dis2', 'o_es2', 'o_e2', 'o_f2', 'o_fis2', 'o_ges2', 'o_g2', 'o_gis2', 'o_as2', 'o_a2',
+                        'o_ais2', 'o_b2', 'o_h2', 'o_c3', 'p_a', 'p_ais', 'p_b', 'p_h', 'p_c1', 'p_cis1', 'p_des1',
+                        'p_d1', 'p_dis1', 'p_es1', 'p_e1', 'p_f1', 'p_fis1', 'p_ges1', 'p_g1', 'p_gis1', 'p_as1',
+                        'p_a1', 'p_ais1', 'p_b1', 'p_h1', 'p_c2', 'p_cis2', 'p_des2', 'p_d2', 'p_dis2', 'p_es2', 'p_e2',
+                        'p_f2', 'p_fis2', 'p_ges2', 'p_g2', 'p_gis2', 'p_as2', 'p_a2', 'p_ais2', 'p_b2', 'p_h2', 'p_c3',
+                        'w_a', 'w_ais', 'w_b', 'w_h', 'w_c1', 'w_cis1', 'w_des1', 'w_d1', 'w_dis1', 'w_es1', 'w_e1',
+                        'w_f1', 'w_fis1', 'w_ges1', 'w_g1', 'w_gis1', 'w_as1', 'w_a1', 'w_ais1', 'w_b1', 'w_h1', 'w_c2',
+                        'w_cis2', 'w_des2', 'w_d2', 'w_dis2', 'w_es2', 'w_e2', 'w_f2', 'w_fis2', 'w_ges2', 'w_g2',
+                        'w_gis2', 'w_as2', 'w_a2', 'w_ais2', 'w_b2', 'w_h2', 'w_c3']
+
+    # Raw photo extension
+    ext = '.jpg'
+
+    # Path with raw train sheets
+    raw_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\raw_sheets'
+
+    # Path where to store individual notes
+    notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
+
+    # Path where to store notes descriptors
+    descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
+
+    # Path with raw user sheets
+    user_raw_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
+
+    # Path where to store individual user staffs
+    user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
+
+    # prepare_train_notes(train_notes_list, raw_sheets_path, notes_path, ext)
+    # stats(train_notes_list, notes_path, descriptors_path, ext)
+    # user(user_raw_path, user_staffs_path, ext)
+    test(user_staffs_path, notes_path, ext)
+
+
+if __name__ == '__main__':
+    main()
