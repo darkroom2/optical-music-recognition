@@ -3,6 +3,7 @@ from pathlib import Path
 
 import cv2 as cv
 import numpy as np
+import torch
 from more_itertools import consecutive_groups
 
 
@@ -346,7 +347,7 @@ def main():
     dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
 
     # Raw photo extension
-    ext = '.jpg'
+    ext = '.png'
 
     """ Crop all training data sheets """
     # Path with raw train sheets
@@ -395,7 +396,10 @@ def main():
     """ Train network on the prepared dataset """
     # python train.py --img 96 --batch 32 --epochs 40 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
     # python train.py --img 128 --batch 16 --epochs 50 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
-    # python train.py --img 128 --batch 16 --epochs 10 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights ./runs/train/yolo5x_notes/weights/last.pt --name yolo5x_notes --cache --device 0
+    # python train.py --img 128 --batch 16 --epochs 20 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights ./runs/train/yolo5x_notes5/weights/last.pt --name yolo5x_notes --cache --device 0
+
+    """ Export network to OpenCV-friendly format (ONNX) """
+    # python ./models/export.py --weights ./runs/train/yolo5x_notes7/weights/best.pt --img 128 --batch 1
 
     """ Preprocess user input """
     # Path with raw user sheets
@@ -403,21 +407,22 @@ def main():
     # Path where to store cropped user sheets
     user_cropped_path = r'./sheets/user/cropped'
 
-    crop_all_sheets(user_raw_path, user_cropped_path, ext)
+    # crop_all_sheets(user_raw_path, user_cropped_path, ext)
 
     """ Preprocess user sheets before extracting staffs from user data sheets """
     # Path where to store preprocessed sheets
     user_preprocessed_path = r'./sheets/user/preprocessed'
 
-    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
+    # preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
     """ Crop out staffs from preprocessed sheets """
     # Path where to store the staffs
     user_staffs_path = r'./sheets/user/staffs'
 
-    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
+    # crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
     """ Detect notes on user input using trained network """
+    # python detect.py --weights runs/train/yolo5x_notes5/weights/best.pt --img 1000 --conf 0.7 --source ../staffs
 
 
 if __name__ == '__main__':
