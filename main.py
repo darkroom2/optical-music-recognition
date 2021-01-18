@@ -1,6 +1,5 @@
 import csv
 from pathlib import Path
-import matplotlib.pyplot as plt
 
 import cv2 as cv
 import numpy as np
@@ -216,12 +215,6 @@ def crop_notes(divider_param, max_notes, train_notes_list, path_in, path_out, ex
 
                 if note.shape[1] > 50:
                     note = note[:, 0:40]
-
-                # if 'ais' == (train_notes_list[current_note][2:]):
-                #     cv.imshow(str(file), staff_vertical)
-                #     cv.imshow('note', note)
-                #     cv.waitKey()
-
                 cv.imwrite(
                     str(output_path /
                         (file.stem[2] + '_' + train_notes_list[current_note][2:] + '_' + str(note_count).zfill(2) + ext)
@@ -233,180 +226,118 @@ def crop_notes(divider_param, max_notes, train_notes_list, path_in, path_out, ex
                     note_count += 1
 
 
-def init_descriptors(method, scale, path_in, path_out, ext_in, ext_out):
-    input_path = Path(path_in)
-    if input_path.is_dir() is not True:
-        raise Exception('input_path should exist, bad input')
-
-    output_path = Path(path_out)
-    if output_path.is_dir() is not True:
-        output_path.mkdir(parents=True)
-
-    # ORB feature extractor
-
-    if method == 'orb':
-        det = cv.ORB_create()
-    elif method == 'sift':
-        det = cv.SIFT_create()
-    elif method == 'kaze':
-        det = cv.KAZE_create()
-    else:
-        det = cv.SIFT_create()
-
-    for file in input_path.glob('*' + ext_in):
-        note = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
-        threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY_INV)[1]
-        if scale is not None:
-            threshed = cv.resize(threshed, None, fx=scale, fy=scale, interpolation=cv.INTER_CUBIC)
-
-        cv.imshow('threshed', threshed)
-        cv.waitKey()
-
-        note_descriptor = det.detectAndCompute(threshed, None)[1]
-
-        if note_descriptor is not None:
-            final_out_dir = output_path / method
-            if not final_out_dir.is_dir():
-                final_out_dir.mkdir(parents=True, exist_ok=True)
-            np.save(str(final_out_dir / (file.stem + ext_out)), note_descriptor)
+# def get_matches_and_pairs(probe, candidates, threshold_matches, threshold_similarity):
+#     # BFMatcher with default params
+#     bf = cv.BFMatcher()
+#
+#     pairs_count = 0
+#     matches_count = 0
+#
+#     for candidate in candidates:
+#         pairs_count += 1
+#
+#         matches = bf.knnMatch(probe.template, candidate.template, k=2)
+#
+#         # Apply ratio test
+#         good = []
+#         for m, n in matches:
+#             if m.distance < threshold_similarity * n.distance:
+#                 good.append([m])
+#
+#         if len(good) > threshold_matches:
+#             matches_count += 1
+#
+#     return matches_count, pairs_count
 
 
-def get_matches_and_pairs(probe, candidates, threshold_matches, threshold_similarity):
-    # BFMatcher with default params
-    bf = cv.BFMatcher()
-
-    pairs_count = 0
-    matches_count = 0
-
-    for candidate in candidates:
-        pairs_count += 1
-
-        matches = bf.knnMatch(probe.template, candidate.template, k=2)
-
-        # Apply ratio test
-        good = []
-        for m, n in matches:
-            if m.distance < threshold_similarity * n.distance:
-                good.append([m])
-
-        if len(good) > threshold_matches:
-            matches_count += 1
-
-    return matches_count, pairs_count
+# def get_fmr_value(threshold_matches, threshold_similarity, all_notes, notes_list):
+#     sum_pairs = 0
+#     sum_matches = 0
+#     for note_name in notes_list:
+#         the_notes = list(filter(lambda note: note_name == note.name, all_notes))
+#         other_notes = list(filter(lambda note: note_name != note.name, all_notes))
+#         for the_note in the_notes:
+#             matches, pairs = get_matches_and_pairs(the_note, other_notes, threshold_matches, threshold_similarity)
+#             sum_matches += matches
+#             sum_pairs += pairs
+#     if sum_pairs == 0:
+#         return 0
+#     return sum_matches / sum_pairs
 
 
-def get_fmr_value(threshold_matches, threshold_similarity, all_notes, notes_list):
-    sum_pairs = 0
-    sum_matches = 0
-    for note_name in notes_list:
-        the_notes = list(filter(lambda note: note_name == note.name, all_notes))
-        other_notes = list(filter(lambda note: note_name != note.name, all_notes))
-        for the_note in the_notes:
-            matches, pairs = get_matches_and_pairs(the_note, other_notes, threshold_matches, threshold_similarity)
-            sum_matches += matches
-            sum_pairs += pairs
-    if sum_pairs == 0:
-        return 0
-    return sum_matches / sum_pairs
+# def get_fnmr_value(threshold_matches, threshold_similarity, all_notes):
+#     sum_pairs = 0
+#     sum_matches = 0
+#     for the_note in all_notes:
+#         # otherUser.getName().contains(theUser.getName()) && otherUser.getId() != theUser.getId()
+#         other_notes = list(
+#             filter(lambda other_note: the_note.name == other_note.name and other_note.id != the_note.id, all_notes))
+#         matches, pairs = get_matches_and_pairs(the_note, other_notes, threshold_matches, threshold_similarity)
+#         sum_matches += matches
+#         sum_pairs += pairs
+#     if sum_pairs == 0:
+#         return 0
+#     return (sum_pairs - sum_matches) / sum_pairs
 
 
-def get_fnmr_value(threshold_matches, threshold_similarity, all_notes):
-    sum_pairs = 0
-    sum_matches = 0
-    for the_note in all_notes:
-        # otherUser.getName().contains(theUser.getName()) && otherUser.getId() != theUser.getId()
-        other_notes = list(
-            filter(lambda other_note: the_note.name == other_note.name and other_note.id != the_note.id, all_notes))
-        matches, pairs = get_matches_and_pairs(the_note, other_notes, threshold_matches, threshold_similarity)
-        sum_matches += matches
-        sum_pairs += pairs
-    if sum_pairs == 0:
-        return 0
-    return (sum_pairs - sum_matches) / sum_pairs
+# def get_statistics_to_csv(thresholds_matches, thresholds_similarities, copies_count, train_notes_list, path_in):
+#     input_path = Path(path_in)
+#     if input_path.is_dir() is not True:
+#         raise Exception('input_path should exist, bad input')
+#
+#     # TODO: unique names could be just notes list...
+#
+#     all_notes = list()
+#
+#     for file in input_path.iterdir():
+#         file_name = file.stem
+#         name, _id = file_name.rsplit('_', 1)
+#         descriptor = np.load(str(file))
+#         all_notes.append(NoteDetails(int(_id), name, descriptor))
+#
+#     all_notes_filtered = list(filter(lambda note: note.id < copies_count, all_notes))
+#
+#     for thr_similarity in thresholds_similarities:
+#         with open(f'roc_sim_{thr_similarity:.2f}.csv', mode='w', newline='') as file:
+#             writer = csv.writer(file)
+#             writer.writerow(['Threshold', 'FMR', 'FNMR'])
+#             for thr_match in thresholds_matches:
+#                 _fmr = get_fmr_value(thr_match, thr_similarity, all_notes_filtered, train_notes_list)
+#                 _fnmr = get_fnmr_value(thr_match, thr_similarity, all_notes_filtered)
+#                 writer.writerow([thr_match, _fmr, _fnmr])
 
 
-def get_statistics_to_csv(thresholds_matches, thresholds_similarities, copies_count, train_notes_list, path_in):
-    input_path = Path(path_in)
-    if input_path.is_dir() is not True:
-        raise Exception('input_path should exist, bad input')
-
-    # TODO: unique names could be just notes list...
-
-    all_notes = list()
-
-    for file in input_path.iterdir():
-        file_name = file.stem
-        name, _id = file_name.rsplit('_', 1)
-        descriptor = np.load(str(file))
-        all_notes.append(NoteDetails(int(_id), name, descriptor))
-
-    all_notes_filtered = list(filter(lambda note: note.id < copies_count, all_notes))
-
-    for thr_similarity in thresholds_similarities:
-        with open('roc_sim' + f'{thr_similarity:.2f}' + '.csv', mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Threshold', 'FMR', 'FNMR'])
-            for thr_match in thresholds_matches:
-                _fmr = get_fmr_value(thr_match, thr_similarity, all_notes_filtered, train_notes_list)
-                _fnmr = get_fnmr_value(thr_match, thr_similarity, all_notes_filtered)
-                writer.writerow([thr_match, _fmr, _fnmr])
+# class NoteDetails:
+#     def __init__(self, _id, name, template):
+#         self.id = _id
+#         self.name = name
+#         self.template = template
+#
+#     def __repr__(self):
+#         return self.name + '_' + str(self.id)
 
 
-class NoteDetails:
-    def __init__(self, _id, name, template):
-        self.id = _id
-        self.name = name
-        self.template = template
-
-    def __repr__(self):
-        return self.name + '_' + str(self.id)
-
-
-def prepare_train_notes(train_notes_list, path_in, path_out, ext):
-    """ Function preprocess raw training notes photos and cuts them to individual notes """
-
-    """Crop all training data sheets"""
-    cropped_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\cropped_sheets'
-    crop_all_sheets(path_in, cropped_sheets_path, ext)
-
-    """Preprocess sheets before extracting notes from trainig data sheets"""
-    preprocessed_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\preprocessed_sheets'
-    page_height = 1600
-    page_margin = 40
-    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
-
-    """Crop out staffs from preprocessed sheets"""
-    staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\staffs'
-    staff_margin = 5
-    crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
-
-    """Crop notes by vertical tact lines"""
-    height_divider = 33  # used to make kernel that filters only vertical lines if height is 60 then
-    each_note_copies = 20  # ile jest nutek danego rodzaju
-    # crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, path_out, ext)
-
-
-def stats(train_notes_list, notes_path, descriptors_path, ext_in):
-    """Compute descriptor for every note"""
-    ext_out = '.npy'
-    resize_up_factor = None
-    init_descriptors('sift', resize_up_factor, notes_path, descriptors_path, ext_in, ext_out)
-
-    """Get statistics FMR and FNMR to plot ROC curve and find threshold that corresponds to EER"""
-    note_copies_count = 20  # ile kopii nutek wziac do obliczen
-    match_count_thresh = list(range(1, 26, 1))
-    similarity_score_thresh = np.arange(0.3, 0.9, 0.05)
-    get_statistics_to_csv(match_count_thresh, similarity_score_thresh, note_copies_count, train_notes_list,
-                          descriptors_path + r'\sift')
-
-    """Test if work"""
-    # user_input_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
-    # user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr2\user_cropped'
-    # crop_all_sheets(user_input_path, user_cropped_path, file_ext)
-    # user_processed_path = r'C:\Users\Radek\PycharmProjects\omr2\user_processed'
-    # preprocess_sheets(page_height, page_margin, user_cropped_path, user_processed_path, file_ext)
-    # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
-    # crop_staffs(staff_margin, user_processed_path, user_staffs_path, file_ext)
+# def stats(train_notes_list, notes_path, descriptors_path, ext_in):
+#     """Compute descriptor for every note"""
+#     ext_out = '.npy'
+#     resize_up_factor = None
+#     # init_descriptors('sift', resize_up_factor, notes_path, descriptors_path, ext_in, ext_out)
+#
+#     """Get statistics FMR and FNMR to plot ROC curve and find threshold that corresponds to EER"""
+#     note_copies_count = 20  # ile kopii nutek wziac do obliczen
+#     match_count_thresh = list(range(3, 5, 1))
+#     similarity_score_thresh = np.arange(0.5, 0.7, 0.1)
+#     get_statistics_to_csv(match_count_thresh, similarity_score_thresh, note_copies_count, train_notes_list,
+#                           descriptors_path + r'\sift')
+#
+#     """Test if work"""
+#     # user_input_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
+#     # user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr2\user_cropped'
+#     # crop_all_sheets(user_input_path, user_cropped_path, file_ext)
+#     # user_processed_path = r'C:\Users\Radek\PycharmProjects\omr2\user_processed'
+#     # preprocess_sheets(page_height, page_margin, user_cropped_path, user_processed_path, file_ext)
+#     # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
+#     # crop_staffs(staff_margin, user_processed_path, user_staffs_path, file_ext)
 
 
 def user(user_raw_path, user_staffs_path, ext):
@@ -423,57 +354,6 @@ def user(user_raw_path, user_staffs_path, ext):
     """Crop out staffs from preprocessed sheets"""
     staff_margin = 5
     crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
-
-
-def test(user_staffs_path, notes_path, ext):
-    img1 = cv.imread(notes_path + r'\p_a1_00' + ext, cv.IMREAD_GRAYSCALE)
-    img1 = cv.threshold(img1, 127, 255, cv.THRESH_BINARY_INV)[1]
-    img2 = cv.imread(user_staffs_path + r'\a_03' + ext, cv.IMREAD_GRAYSCALE)
-    img2 = cv.threshold(img2, 127, 255, cv.THRESH_BINARY_INV)[1]
-
-    cv.imshow('img1', img1)
-    cv.imshow('img2', img2)
-    cv.waitKey()
-
-    feature_name = 'orb'
-
-    detector, matcher = init_feature(feature_name)
-
-    if detector is None:
-        print('unknown feature:', feature_name)
-        exit(1)
-
-    print('using', feature_name)
-
-    kp1, desc1 = detector.detectAndCompute(img1, None)
-    kp2, desc2 = detector.detectAndCompute(img2, None)
-
-    raw_matches = matcher.knnMatch(desc1, trainDescriptors=desc2, k=2)  # 2
-
-    good = []
-    for m, n in raw_matches:
-        if m.distance < 0.7 * n.distance:
-            good.append(m)
-
-    draw_params = dict(matchColor=(0, 255, 0),  # draw matches in green color
-                       singlePointColor=None,
-                       matchesMask=None,  # draw only inliers
-                       flags=2)
-    img3 = cv.drawMatches(img1, kp1, img2, kp2, good, None, **draw_params)
-    cv.imshow('matches', img3)
-    cv.waitKey()
-
-def filter_matches(kp1, kp2, matches, ratio=0.75):
-    mkp1, mkp2 = [], []
-    for m in matches:
-        if len(m) == 2 and m[0].distance < m[1].distance * ratio:
-            m = m[0]
-            mkp1.append(kp1[m.queryIdx])
-            mkp2.append(kp2[m.trainIdx])
-    p1 = np.float32([kp.pt for kp in mkp1])
-    p2 = np.float32([kp.pt for kp in mkp2])
-    kp_pairs = zip(mkp1, mkp2)
-    return p1, p2, list(kp_pairs)
 
 
 def init_feature(name):
@@ -509,6 +389,92 @@ def init_feature(name):
     return detector, matcher
 
 
+def prepare_for_cascades(negs_path, positives_path):
+    input_path = Path(negs_path)
+    neg = input_path.parent / r'neg.txt'
+    if input_path.is_dir() is not True:
+        raise Exception('input_path should exist, bad input')
+
+    with open(neg, 'w') as bg:
+        for file in input_path.iterdir():
+            bg.write(str(file.relative_to(input_path.parent)) + '\n')
+
+    input_path2 = Path(positives_path)
+    pos = input_path2.parent / r'pos.txt'
+    if input_path2.is_dir() is not True:
+        raise Exception('input_path should exist, bad input')
+
+    with open(pos, 'w') as pos_file:
+        for file in input_path2.iterdir():
+            note = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
+            threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY)[1]
+            x, y, w, h = cv.boundingRect(threshed)
+            # (x, y, width, height)
+            bounds = ' '.join(str(x) for x in [x, y, w, h])
+            pos_file.write(str(file.relative_to(input_path2.parent)) + ' 1 ' + bounds + '\n')
+
+
+def prepare_for_yolo(positives_path, dict_of_notes):
+    input_path = Path(positives_path)
+
+    if input_path.is_dir() is not True:
+        raise Exception('input_path should exist, bad input')
+
+    # generate txt file with bboxes of the objects for each photo
+    for file in input_path.glob('*.jpg'):
+        # format per row: class x_center y_center width height
+        name = file.name[:file.name.rindex('_')]
+        note_class = dict_of_notes[name]
+
+        note = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
+        img_h, img_w = note.shape[:2]
+        threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY)[1]
+        x, y, w, h = cv.boundingRect(threshed)
+        x_cnt = x + w / 2
+        y_cnt = y + h / 2
+        norm_bounds = [x_cnt / img_w, y_cnt / img_h, w / img_w, h / img_h]
+        # (x, y, width, height)
+        bounds_str = ' '.join(f'{i:.6f}' for i in norm_bounds)
+
+        note_txt = input_path / 'txt' / (str(file.stem) + '.txt')
+        note_txt.parent.mkdir(parents=True, exist_ok=True)
+        with open(str(note_txt), 'w+') as pos_file:
+            pos_file.write(f'{note_class} {bounds_str}')
+
+
+def split_for_train_valid_test(positives_path, ratio_train, ratio_valid, ratio_test):
+    if round(ratio_train + ratio_valid + ratio_test, 5) != 1.0:
+        raise Exception('Split ratio exceeds 1.0')
+
+    each_note_count = 20
+    train_notes_count = int(each_note_count * ratio_train)
+    validation_notes_count = int(each_note_count * ratio_valid)
+    # test_notes_count = each_note_count * ratio_test
+
+    input_path = Path(positives_path)
+
+    if input_path.is_dir() is not True:
+        raise Exception('input_path should exist, bad input')
+
+    train_dir = input_path.parent / 'train'
+    validate_dir = input_path.parent / 'validate'
+    test_dir = input_path.parent / 'test'
+
+    for _dir in [train_dir, validate_dir, test_dir]:
+        _dir.mkdir(parents=True, exist_ok=True)
+
+    for file in input_path.iterdir():
+        _id = int(file.stem[file.stem.rindex('_') + 1:])
+        if _id < train_notes_count:
+            file.rename(train_dir / file.name)
+        elif _id < train_notes_count + validation_notes_count:
+            file.rename(validate_dir / file.name)
+        else:
+            file.rename(test_dir / file.name)
+
+    #     all_notes_filtered = list(filter(lambda note: note.id < copies_count, all_notes))
+
+
 def main():
     # List of notes included in train data
     train_notes_list = ['c_a', 'c_ais', 'c_b', 'c_h', 'c_c1', 'c_cis1', 'c_des1', 'c_d1', 'c_dis1', 'c_es1', 'c_e1',
@@ -527,28 +493,71 @@ def main():
                         'w_cis2', 'w_des2', 'w_d2', 'w_dis2', 'w_es2', 'w_e2', 'w_f2', 'w_fis2', 'w_ges2', 'w_g2',
                         'w_gis2', 'w_as2', 'w_a2', 'w_ais2', 'w_b2', 'w_h2', 'w_c3']
 
+    dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
+
     # Raw photo extension
     ext = '.jpg'
 
+    """Crop all training data sheets"""
     # Path with raw train sheets
-    raw_sheets_path = r'C:\Users\Radek\PycharmProjects\omr2\raw_sheets'
+    raw_sheets_path = r'/sheets/database/raw'
+    # Path where to store cropped sheets
+    cropped_sheets_path = r'/sheets/database/cropped'
 
+    crop_all_sheets(raw_sheets_path, cropped_sheets_path, ext)
+
+    """Preprocess sheets before extracting notes from trainig data sheets"""
+    # Path where to store preprocessed sheets
+    preprocessed_sheets_path = r'/sheets/database/preprocessed'
+    # What height to resize the page to
+    page_height = 1600
+    # How much to crop the borders
+    page_margin = 40
+
+    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
+
+    """Crop out staffs from preprocessed sheets"""
+    # Path where to store the staffs
+    staffs_path = r'/sheets/database/staffs'
+    # How much to crop borders of staff image
+    staff_margin = 5
+
+    crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
+
+    """Crop notes by vertical tact lines"""
     # Path where to store individual notes
-    notes_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
+    notes_path = r'/sheets/database/notes'
+    # Parameter determining vertical and horizontal filter kernel dimensions
+    height_divider = 33
+    # How many notes of each type in training dataset
+    each_note_copies = 20
+
+    crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
 
     # Path where to store notes descriptors
-    descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
+    # descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
 
     # Path with raw user sheets
-    user_raw_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
+    # user_raw_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
 
     # Path where to store individual user staffs
-    user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
+    # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
 
-    # prepare_train_notes(train_notes_list, raw_sheets_path, notes_path, ext)
     # stats(train_notes_list, notes_path, descriptors_path, ext)
     # user(user_raw_path, user_staffs_path, ext)
-    test(user_staffs_path, notes_path, ext)
+    # test(user_staffs_path, notes_path, ext)
+
+    # Path with negative samples
+    # negs_path = r'C:\Users\Radek\PycharmProjects\omr2\negs'
+
+    # Path with positive samples
+    # positives_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
+
+    # prepare_for_cascades(negs_path, positives_path)
+    # prepare_for_yolo(positives_path, dict_of_notes)
+    # split_for_train_valid_test(positives_path, 0.7, 0.2, 0.1)
+
+    # test(user_staffs_path, notes_path, ext)
 
 
 if __name__ == '__main__':
