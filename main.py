@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import cv2 as cv
@@ -231,24 +232,38 @@ def user(user_raw_path, user_staffs_path, ext):
     crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
 
-def prepare_for_yolo(dict_of_notes, train_ratio, notes_path, yolo_database_path, ext):
+def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, yolo_dataset_path, ext):
     input_path = Path(notes_path)
 
     if input_path.is_dir() is not True:
         raise Exception('input_path should exist, bad input')
 
-    output_path = Path(yolo_database_path)
-    images_path = output_path / 'images'
-    labels_path = output_path / 'labels'
+    if 1 < train_ratio < 0:
+        raise Exception('Split ratio not in (0, 1]')
+
+    ids = list(range(0, 20, 1))
+    np.random.shuffle(ids)
+
+    train_notes_count = round(train_ratio * each_note_copies)
+
+    train_set = ids[:train_notes_count]
+
+    output_path = Path(yolo_dataset_path)
+    train_img_path = output_path / 'images' / 'train'
+    validate_img_path = output_path / 'images' / 'validate'
+    train_labels_path = output_path / 'labels' / 'train'
+    validate_labels_path = output_path / 'labels' / 'validate'
     if output_path.is_dir() is not True:
-        output_path.mkdir(parents=True)
-        images_path.mkdir()
-        labels_path.mkdir()
+        train_img_path.mkdir(parents=True)
+        validate_img_path.mkdir()
+        train_labels_path.mkdir(parents=True)
+        validate_labels_path.mkdir()
 
     # generate txt file with bboxes of the objects for each photo
     for file in input_path.glob('*' + ext):
         # format per row: class x_center y_center width height
         name = file.name[:file.name.rindex('_')]
+        _id = file.name[file.name.rindex('_') + 1:-len(ext)]
         note_class = dict_of_notes[name]
 
         note = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
@@ -261,13 +276,20 @@ def prepare_for_yolo(dict_of_notes, train_ratio, notes_path, yolo_database_path,
 
         bounds_str = ' '.join(f'{i:.6f}' for i in norm_bounds)
 
-        note_txt = labels_path / (file.stem + '.txt')
+        if int(_id) in train_set:
+            folder_img = train_img_path
+            folder_label = train_labels_path
+        else:
+            folder_img = validate_img_path
+            folder_label = validate_labels_path
+
+        note_txt = folder_label / (file.stem + '.txt')
 
         with open(str(note_txt), 'w+') as pos_file:
             pos_file.write(f'{note_class} {bounds_str}')
 
-        note_img = images_path / file.name
-        file.rename(note_img)
+        note_img = folder_img / file.name
+        shutil.copy(file, note_img)
 
 
 def split_for_train_valid_test(positives_path, ratio_train, ratio_valid, ratio_test):
@@ -326,7 +348,7 @@ def main():
     # Raw photo extension
     ext = '.jpg'
 
-    """Crop all training data sheets"""
+    """ Crop all training data sheets """
     # Path with raw train sheets
     raw_sheets_path = r'./sheets/database/raw'
     # Path where to store cropped sheets
@@ -334,7 +356,7 @@ def main():
 
     # crop_all_sheets(raw_sheets_path, cropped_sheets_path, ext)
 
-    """Preprocess sheets before extracting notes from trainig data sheets"""
+    """ Preprocess sheets before extracting notes from trainig data sheets """
     # Path where to store preprocessed sheets
     preprocessed_sheets_path = r'./sheets/database/preprocessed'
     # What height to resize the page to
@@ -344,7 +366,7 @@ def main():
 
     # preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
 
-    """Crop out staffs from preprocessed sheets"""
+    """ Crop out staffs from preprocessed sheets """
     # Path where to store the staffs
     staffs_path = r'./sheets/database/staffs'
     # How much to crop borders of staff image
@@ -352,7 +374,7 @@ def main():
 
     # crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
 
-    """Crop notes by vertical tact lines"""
+    """ Crop notes by vertical tact lines """
     # Path where to store individual notes
     notes_path = r'./sheets/database/notes'
     # Parameter determining vertical and horizontal filter kernel dimensions
@@ -362,37 +384,40 @@ def main():
 
     # crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
 
-    """Convert """
+    """ Generate yolo compatible dataset """
     # Path where to store yolo-like database
-    yolo_database_path = r'./yolo_notes'
+    yolo_dataset_path = r'./yolo_notes'
     # How to split files for training / validation
     training_ratio = 0.5
 
-    prepare_for_yolo(dict_of_notes, training_ratio, notes_path, yolo_database_path, ext)
+    # prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
-    # Path where to store notes descriptors
-    # descriptors_path = r'C:\Users\Radek\PycharmProjects\omr2\descriptors'
+    """ Train network on the prepared dataset """
+    # python train.py --img 96 --batch 32 --epochs 40 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
+    # python train.py --img 128 --batch 16 --epochs 50 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
+    # python train.py --img 128 --batch 16 --epochs 10 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights ./runs/train/yolo5x_notes/weights/last.pt --name yolo5x_notes --cache --device 0
 
+    """ Preprocess user input """
     # Path with raw user sheets
-    # user_raw_path = r'C:\Users\Radek\PycharmProjects\omr2\user_raw'
+    user_raw_path = r'./sheets/user/raw'
+    # Path where to store cropped user sheets
+    user_cropped_path = r'./sheets/user/cropped'
 
-    # Path where to store individual user staffs
-    # user_staffs_path = r'C:\Users\Radek\PycharmProjects\omr2\user_staffs'
+    crop_all_sheets(user_raw_path, user_cropped_path, ext)
 
-    # stats(train_notes_list, notes_path, descriptors_path, ext)
-    # user(user_raw_path, user_staffs_path, ext)
-    # test(user_staffs_path, notes_path, ext)
+    """ Preprocess user sheets before extracting staffs from user data sheets """
+    # Path where to store preprocessed sheets
+    user_preprocessed_path = r'./sheets/user/preprocessed'
 
-    # Path with negative samples
-    # negs_path = r'C:\Users\Radek\PycharmProjects\omr2\negs'
+    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
-    # Path with positive samples
-    # positives_path = r'C:\Users\Radek\PycharmProjects\omr2\notes'
+    """ Crop out staffs from preprocessed sheets """
+    # Path where to store the staffs
+    user_staffs_path = r'./sheets/user/staffs'
 
-    # prepare_for_cascades(negs_path, positives_path)
-    # split_for_train_valid_test(positives_path, 0.7, 0.2, 0.1)
+    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
-    # test(user_staffs_path, notes_path, ext)
+    """ Detect notes on user input using trained network """
 
 
 if __name__ == '__main__':
