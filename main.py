@@ -3,7 +3,6 @@ from pathlib import Path
 
 import cv2 as cv
 import numpy as np
-import torch
 from more_itertools import consecutive_groups
 
 
@@ -347,7 +346,7 @@ def main():
     dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
 
     # Raw photo extension
-    ext = '.png'
+    ext = '.jpg'
 
     """ Crop all training data sheets """
     # Path with raw train sheets
@@ -391,7 +390,7 @@ def main():
     # How to split files for training / validation
     training_ratio = 0.5
 
-    # prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
+    prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
     """ Train network on the prepared dataset """
     # python train.py --img 96 --batch 32 --epochs 40 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
