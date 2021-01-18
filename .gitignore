@@ -1,7 +1,5 @@
-/cropped_sheets/
-/preprocessed_sheets/
-/notes/
-/staffs/
-/sheets/hidden/
-/user_raw/hidden/
 /venv/
+/sheets/database/preprocessed/
+/sheets/database/staffs/
+/sheets/database/cropped/
+/sheets/database/notes/
