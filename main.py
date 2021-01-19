@@ -1,3 +1,4 @@
+import operator
 import shutil
 from pathlib import Path
 
@@ -141,7 +142,7 @@ def crop_staffs(target_margin, path_in, path_out, ext):
             staff = preprocessed_sheet[staff_range[0] - target_margin:staff_range[-1] + target_margin, :]
             threshed = cv.threshold(staff, 127, 255, cv.THRESH_BINARY)[1]
             x, y, w, h = cv.boundingRect(threshed)
-            key_margin = 60
+            key_margin = target_margin * 10
             key_cropped = threshed[y:y + h, x + key_margin:x + w]
             x, y, w, h = cv.boundingRect(key_cropped)
             bound_cropped = key_cropped[y:y + h, x:x + w]
@@ -216,22 +217,6 @@ def crop_notes(divider_param, max_notes, train_notes_list, path_in, path_out, ex
                     note_count += 1
 
 
-def user(user_raw_path, user_staffs_path, ext):
-    """Crop all user sheets"""
-    user_cropped_path = r'C:\Users\Radek\PycharmProjects\omr2\user_cropped'
-    crop_all_sheets(user_raw_path, user_cropped_path, ext)
-
-    """Preprocess sheets before extracting staffs from user data sheets"""
-    user_preprocessed_path = r'C:\Users\Radek\PycharmProjects\omr2\user_preprocessed'
-    page_height = 1600
-    page_margin = 40
-    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
-
-    """Crop out staffs from preprocessed sheets"""
-    staff_margin = 5
-    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
-
-
 def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, yolo_dataset_path, ext):
     input_path = Path(notes_path)
 
@@ -292,39 +277,6 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         shutil.copy(file, note_img)
 
 
-def split_for_train_valid_test(positives_path, ratio_train, ratio_valid, ratio_test):
-    if round(ratio_train + ratio_valid + ratio_test, 5) != 1.0:
-        raise Exception('Split ratio exceeds 1.0')
-
-    each_note_count = 20
-    train_notes_count = int(each_note_count * ratio_train)
-    validation_notes_count = int(each_note_count * ratio_valid)
-    # test_notes_count = each_note_count * ratio_test
-
-    input_path = Path(positives_path)
-
-    if input_path.is_dir() is not True:
-        raise Exception('input_path should exist, bad input')
-
-    train_dir = input_path.parent / 'train'
-    validate_dir = input_path.parent / 'validate'
-    test_dir = input_path.parent / 'test'
-
-    for _dir in [train_dir, validate_dir, test_dir]:
-        _dir.mkdir(parents=True, exist_ok=True)
-
-    for file in input_path.iterdir():
-        _id = int(file.stem[file.stem.rindex('_') + 1:])
-        if _id < train_notes_count:
-            file.rename(train_dir / file.name)
-        elif _id < train_notes_count + validation_notes_count:
-            file.rename(validate_dir / file.name)
-        else:
-            file.rename(test_dir / file.name)
-
-    #     all_notes_filtered = list(filter(lambda note: note.id < copies_count, all_notes))
-
-
 def main():
     # List of notes included in train data
     train_notes_list = ['c_a', 'c_ais', 'c_b', 'c_h', 'c_c1', 'c_cis1', 'c_des1', 'c_d1', 'c_dis1', 'c_es1', 'c_e1',
@@ -344,6 +296,7 @@ def main():
                         'w_gis2', 'w_as2', 'w_a2', 'w_ais2', 'w_b2', 'w_h2', 'w_c3']
 
     dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
+    dict_of_classes = {i: train_notes_list[i] for i in range(0, len(train_notes_list))}
 
     # Raw photo extension
     ext = '.png'
@@ -410,6 +363,7 @@ def main():
     # Path where to store the staffs
     user_staffs_path = r'./sheets/user/staffs'
 
+    # TODO: zeby nie wykrywalo nazw piosenki jako pieciolinia (juz to robilem, poprawic)
     # crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
     """ Prepare YOLOv5 commands """
@@ -417,7 +371,7 @@ def main():
     project_name = 'notes'
     train_img_size = 96
     batch_size = 256
-    epochs = 500
+    epochs = 300
     data_config = r'../config/moje.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
@@ -431,13 +385,183 @@ def main():
     train_command = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
 
     """ Detect notes on user input using trained network """
-    detect_command = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project {det_info_path} --name {network_name} --save-txt'
+    detect_command = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project {det_info_path} --name {network_name} --save-txt --save-conf --device 0'
 
     print(train_command)
     print(detect_command)
 
     """ Convert detected notes to MIDI format """
     # TODO: Wziac z 'det_info_path' info o nutkach i przetworzyc je na MIDI i odtworzyc ten MIDI xd i koniec!!!
+    labels_path = f'./detected/{network_name}/labels'
+
+    input_path = Path(labels_path)
+
+    if input_path.is_dir() is not True:
+        raise Exception('No detected folder. You should run detection first.')
+
+    notes = list()
+    song_names = set()
+
+    # zrobic NoteDetails gdzie bedzie klasa, x, y, conf i dodawac nutki do piosenki
+    # (cls, *xywh, conf) struktura pliku
+    for file in input_path.iterdir():
+        with file.open('r') as f:
+            lines = f.readlines()
+
+        split_filename = file.stem.split('_')
+        song_name = split_filename[0]
+        sheet_number = int(split_filename[1])
+        staff_number = int(split_filename[2])
+
+        for line in lines:
+            cls, x, y, w, h, conf = line.strip().split(' ')
+            song_names.add(song_name)
+            note_name = dict_of_classes[int(cls)]
+            value, height = note_name.split('_')
+            #         def __init__(self, cls, value, height, x, y, conf, song_name, sheet_number, staff_number):
+            notes.append(NoteDetails(int(cls), value, height, float(x), float(y), float(conf), song_name, sheet_number,
+                                     staff_number))
+
+    # mam juz liste wszystkich nutek z lokalizacja i nazwa pliku. Zrobic filtr zeby z tej listy zrobil liste piosenek (nazwa pliku) i trzymal tylko nutki z ta nazwa pliku
+    song_notes = dict()
+    for song_name in song_names:
+        song_notes_list = list(filter(lambda note: song_name == note.song_name, notes))
+        # posortowac te nutki przy piosenkach wedlug numeru kartki, numeru pieciolinii, wsp. x
+        xd = sorted(song_notes_list, key=operator.attrgetter('sheet_number', 'staff_number', 'x'))
+        # sorted(s, key=operator.attrgetter('x'))
+        song_notes[song_name] = xd
+
+    print('xd')
+
+    note_numbers = {
+        'a': 57,
+        'ais': 58,
+        'b': 58,
+        'h': 59,
+        'c1': 60,
+        'cis1': 61,
+        'des1': 61,
+        'd1': 62,
+        'dis1': 63,
+        'es1': 63,
+        'e1': 64,
+        'f1': 65,
+        'fis1': 66,
+        'ges1': 66,
+        'g1': 67,
+        'gis1': 68,
+        'as1': 68,
+        'a1': 69,
+        'ais1': 70,
+        'b1': 70,
+        'h1': 71,
+        'c2': 72,
+        'cis2': 73,
+        'des2': 73,
+        'd2': 74,
+        'dis2': 75,
+        'es2': 75,
+        'e2': 76,
+        'f2': 77,
+        'fis2': 78,
+        'ges2': 78,
+        'g2': 79,
+        'gis2': 80,
+        'as2': 80,
+        'a2': 81,
+        'ais2': 82,
+        'b2': 82,
+        'h2': 83,
+        'c3': 84
+    }
+
+    note_values = {
+        'c': 4.0,
+        'o': 0.5,
+        'p': 2.0,
+        'w': 1.0
+    }
+
+    print('xd')
+
+    # TODO: zrobic slownik nutek i ich ustawien (tych ponizej) np. ze pulnuta ma inne 'duration' itp
+
+    from midiutil import MIDIFile
+    track = 0
+    channel = 0
+    time = 0  # In beats
+    # duration = 1  # In beats
+    tempo = 80  # In BPM
+    volume = 100  # 0-127, as per the MIDI standard
+    for song_name in song_notes:
+        # degrees = [60, 62, 64, 65, 67, 69, 71, 72]  # MIDI note number
+        # print(song_name, song_notes[song_name])
+        degrees = [(note_values[note.value], note_numbers[note.height]) for note in song_notes[song_name]]
+        my_midi = MIDIFile(1)  # One track, defaults to format 1 (tempo track is created automatically)
+        my_midi.addTempo(track, time, tempo)
+        duration_sum = 0
+        for duration, pitch in degrees:
+            my_midi.addNote(track, channel, pitch, duration_sum, duration, volume)
+            duration_sum += duration
+
+        with open(f'{song_name}.mid', "wb") as output_file:
+            my_midi.writeFile(output_file)
+
+    import pygame
+
+    def play_music(music_file):
+        """
+        stream music with mixer.music module in blocking manner
+        this will stream the sound from disk while playing
+        """
+        clock = pygame.time.Clock()
+        try:
+            pygame.mixer.music.load(music_file)
+            print("Music file %s loaded!" % music_file)
+        except pygame.error:
+            print("File %s not found! (%s)" % (music_file, pygame.get_error()))
+            return
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            # check if playback has finished
+            clock.tick(30)
+
+    # pick a midi music file you have ...
+    # (if not in working folder use full path)
+
+    midi_file = r'C:\Users\Radek\PycharmProjects\omr24\major-scale.mid'
+    freq = 44100  # audio CD quality
+    bitsize = -16  # unsigned 16 bit
+    channels = 2  # 1 is mono, 2 is stereo
+    buffer = 1024  # number of samples
+    pygame.mixer.init(freq, bitsize, channels, buffer)
+
+    # optional volume 0 to 1.0
+    pygame.mixer.music.set_volume(0.8)
+    try:
+        play_music(midi_file)
+    except KeyboardInterrupt:
+        # if user hits Ctrl/C then exit
+        # (works only in console mode)
+        pygame.mixer.music.fadeout(1000)
+        pygame.mixer.music.stop()
+        raise SystemExit
+
+
+class NoteDetails:
+    def __init__(self, cls, value, height, x, y, conf, song_name, sheet_number, staff_number):
+        self.cls = cls
+        self.value = value
+        self.height = height
+        self.x = x
+        self.y = y
+        self.conf = conf
+        self.song_name = song_name
+        self.sheet_number = sheet_number
+        self.staff_number = staff_number
+
+    def __repr__(self):
+        return f'{self.cls} {self.value} {self.height} {self.x} {self.y} {self.conf} {self.song_name} {self.sheet_number} {self.staff_number}'
 
 
 if __name__ == '__main__':
