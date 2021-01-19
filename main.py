@@ -4,6 +4,7 @@ from pathlib import Path
 
 import cv2 as cv
 import numpy as np
+from midiutil import MIDIFile
 from more_itertools import consecutive_groups
 
 
@@ -112,6 +113,7 @@ def preprocess_sheets(target_height, target_margin, path_in, path_out, ext):
         cv.imwrite(str(output_path / file.name), threshed)
 
 
+# TODO: zeby nie wykrywalo nazw piosenki jako pieciolinia (juz to robilem, poprawic)
 def crop_staffs(target_margin, path_in, path_out, ext):
     input_path = Path(path_in)
     if input_path.is_dir() is not True:
@@ -277,6 +279,110 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         shutil.copy(file, note_img)
 
 
+def play_midi():
+    import pygame
+    def play_music(music_file):
+        """
+        stream music with mixer.music module in blocking manner
+        this will stream the sound from disk while playing
+        """
+        clock = pygame.time.Clock()
+        try:
+            pygame.mixer.music.load(music_file)
+            print("Music file %s loaded!" % music_file)
+        except pygame.error:
+            print("File %s not found! (%s)" % (music_file, pygame.get_error()))
+            return
+        pygame.mixer.music.play()
+        while pygame.mixer.music.get_busy():
+            # check if playback has finished
+            clock.tick(30)
+
+    # pick a midi music file you have ...
+    # (if not in working folder use full path)
+    midi_file = r'C:\Users\Radek\PycharmProjects\omr24\major-scale.mid'
+    freq = 44100  # audio CD quality
+    bitsize = -16  # unsigned 16 bit
+    channels = 2  # 1 is mono, 2 is stereo
+    buffer = 1024  # number of samples
+    pygame.mixer.init(freq, bitsize, channels, buffer)
+    # optional volume 0 to 1.0
+    pygame.mixer.music.set_volume(0.8)
+    try:
+        play_music(midi_file)
+    except KeyboardInterrupt:
+        # if user hits Ctrl/C then exit
+        # (works only in console mode)
+        pygame.mixer.music.fadeout(1000)
+        pygame.mixer.music.stop()
+        raise SystemExit
+
+
+def get_song_notes_dict(dict_of_classes, labels_path):
+    input_path = Path(labels_path)
+    if input_path.is_dir() is not True:
+        raise Exception('No detected folder. You should run detection first.')
+    notes = list()
+    song_names = set()
+    for file in input_path.iterdir():
+        with file.open('r') as f:
+            lines = f.readlines()
+
+        split_filename = file.stem.split('_')
+        song_name = split_filename[0]
+        sheet_number = int(split_filename[1])
+        staff_number = int(split_filename[2])
+
+        for line in lines:
+            cls, x, y, w, h, conf = line.strip().split(' ')
+            song_names.add(song_name)
+            note_name = dict_of_classes[int(cls)]
+            value, height = note_name.split('_')
+            #         def __init__(self, cls, value, height, x, y, conf, song_name, sheet_number, staff_number):
+            notes.append(NoteDetails(int(cls), value, height, float(x), float(y), float(conf), song_name, sheet_number,
+                                     staff_number))
+    song_notes = dict()
+    for song_name in song_names:
+        song_notes_list = list(filter(lambda note: song_name == note.song_name, notes))
+        song_notes[song_name] = sorted(song_notes_list, key=operator.attrgetter('sheet_number', 'staff_number', 'x'))
+    return song_notes
+
+
+def get_commands(yolov5_proj_dir, batch_size, confidence, data_config, det_info_path, detect_img_size, epochs,
+                 network_config,
+                 network_name, network_type, train_img_size, trained_net_path, user_staffs_path):
+    train_command = f'cd {yolov5_proj_dir} && python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
+    detect_command = f'cd {yolov5_proj_dir} && python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project {det_info_path} --name {network_name} --save-txt --save-conf --device 0'
+    return train_command, detect_command
+
+
+def generate_midi(song_notes, note_numbers, note_values, music_path):
+    output_path = Path(music_path)
+
+    if output_path.is_dir() is not True:
+        output_path.mkdir(parents=True)
+
+    track = 0
+    channel = 0
+    time = 0  # In beats
+    # duration = 1  # In beats
+    tempo = 80  # In BPM
+    volume = 100  # 0-127, as per the MIDI standard
+    for song_name in song_notes:
+        # degrees = [60, 62, 64, 65, 67, 69, 71, 72]  # MIDI note number
+        # print(song_name, song_notes[song_name])
+        degrees = [(note_values[note.value], note_numbers[note.height]) for note in song_notes[song_name]]
+        my_midi = MIDIFile(1)  # One track, defaults to format 1 (tempo track is created automatically)
+        my_midi.addTempo(track, time, tempo)
+        duration_sum = 0
+        for duration, pitch in degrees:
+            my_midi.addNote(track, channel, pitch, duration_sum, duration, volume)
+            duration_sum += duration
+
+        with output_path / f'{song_name}.mid' as output_file:
+            my_midi.writeFile(output_file)
+
+
 def main():
     # List of notes included in train data
     train_notes_list = ['c_a', 'c_ais', 'c_b', 'c_h', 'c_c1', 'c_cis1', 'c_des1', 'c_d1', 'c_dis1', 'c_es1', 'c_e1',
@@ -307,7 +413,7 @@ def main():
     # Path where to store cropped sheets
     cropped_sheets_path = r'./sheets/database/cropped'
 
-    # crop_all_sheets(raw_sheets_path, cropped_sheets_path, ext)
+    crop_all_sheets(raw_sheets_path, cropped_sheets_path, ext)
 
     """ Preprocess sheets before extracting notes from trainig data sheets """
     # Path where to store preprocessed sheets
@@ -317,7 +423,7 @@ def main():
     # How much to crop the borders
     page_margin = 40
 
-    # preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
+    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
 
     """ Crop out staffs from preprocessed sheets """
     # Path where to store the staffs
@@ -325,7 +431,7 @@ def main():
     # How much to crop borders of staff image
     staff_margin = 5
 
-    # crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
+    crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
 
     """ Crop notes by vertical tact lines """
     # Path where to store individual notes
@@ -335,7 +441,7 @@ def main():
     # How many notes of each type in training dataset
     each_note_copies = 20
 
-    # crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
+    crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
 
     """ Generate yolo compatible dataset """
     # Path where to store yolo-like database
@@ -343,7 +449,7 @@ def main():
     # How to split files for training / validation
     training_ratio = 0.5
 
-    # prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
+    prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
     """ Preprocess user input """
     # Path with raw user sheets
@@ -351,22 +457,22 @@ def main():
     # Path where to store cropped user sheets
     user_cropped_path = r'./sheets/user/cropped'
 
-    # crop_all_sheets(user_raw_path, user_cropped_path, ext)
+    crop_all_sheets(user_raw_path, user_cropped_path, ext)
 
     """ Preprocess user sheets before extracting staffs from user data sheets """
     # Path where to store preprocessed sheets
     user_preprocessed_path = r'./sheets/user/preprocessed'
 
-    # preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
+    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
     """ Crop out staffs from preprocessed sheets """
     # Path where to store the staffs
     user_staffs_path = r'./sheets/user/staffs'
 
-    # TODO: zeby nie wykrywalo nazw piosenki jako pieciolinia (juz to robilem, poprawic)
-    # crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
+    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
-    """ Prepare YOLOv5 commands """
+    """ Prepare parameters for YOLOv5 commands """
+    yolov5_proj_dir = r'./yolov5'
     network_type = 'yolov5x'
     project_name = 'notes'
     train_img_size = 96
@@ -381,58 +487,25 @@ def main():
     confidence = 0.5
     det_info_path = '../detected'
 
+    """ Generate yolo train and detect command """
+    detect_command, train_command = get_commands(yolov5_proj_dir, batch_size, confidence, data_config, det_info_path,
+                                                 detect_img_size, epochs, network_config, network_name, network_type,
+                                                 train_img_size, trained_net_path, user_staffs_path)
+
     """ Train network on the prepared dataset """
-    train_command = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
+    exec(train_command)
 
     """ Detect notes on user input using trained network """
-    detect_command = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project {det_info_path} --name {network_name} --save-txt --save-conf --device 0'
+    exec(detect_command)
 
-    print(train_command)
-    print(detect_command)
-
-    """ Convert detected notes to MIDI format """
-    # TODO: Wziac z 'det_info_path' info o nutkach i przetworzyc je na MIDI i odtworzyc ten MIDI xd i koniec!!!
+    """ Extract notes information after detection """
+    # Path where the information is stored
     labels_path = f'./detected/{network_name}/labels'
+    # Gets {song_name: notes_list} dictionary
+    song_notes = get_song_notes_dict(dict_of_classes, labels_path)
 
-    input_path = Path(labels_path)
-
-    if input_path.is_dir() is not True:
-        raise Exception('No detected folder. You should run detection first.')
-
-    notes = list()
-    song_names = set()
-
-    # zrobic NoteDetails gdzie bedzie klasa, x, y, conf i dodawac nutki do piosenki
-    # (cls, *xywh, conf) struktura pliku
-    for file in input_path.iterdir():
-        with file.open('r') as f:
-            lines = f.readlines()
-
-        split_filename = file.stem.split('_')
-        song_name = split_filename[0]
-        sheet_number = int(split_filename[1])
-        staff_number = int(split_filename[2])
-
-        for line in lines:
-            cls, x, y, w, h, conf = line.strip().split(' ')
-            song_names.add(song_name)
-            note_name = dict_of_classes[int(cls)]
-            value, height = note_name.split('_')
-            #         def __init__(self, cls, value, height, x, y, conf, song_name, sheet_number, staff_number):
-            notes.append(NoteDetails(int(cls), value, height, float(x), float(y), float(conf), song_name, sheet_number,
-                                     staff_number))
-
-    # mam juz liste wszystkich nutek z lokalizacja i nazwa pliku. Zrobic filtr zeby z tej listy zrobil liste piosenek (nazwa pliku) i trzymal tylko nutki z ta nazwa pliku
-    song_notes = dict()
-    for song_name in song_names:
-        song_notes_list = list(filter(lambda note: song_name == note.song_name, notes))
-        # posortowac te nutki przy piosenkach wedlug numeru kartki, numeru pieciolinii, wsp. x
-        xd = sorted(song_notes_list, key=operator.attrgetter('sheet_number', 'staff_number', 'x'))
-        # sorted(s, key=operator.attrgetter('x'))
-        song_notes[song_name] = xd
-
-    print('xd')
-
+    """ Prepare notes parameters """
+    # Translates note names to MIDI values
     note_numbers = {
         'a': 57,
         'ais': 58,
@@ -474,7 +547,7 @@ def main():
         'h2': 83,
         'c3': 84
     }
-
+    # Translates note prefix to MIDI height parameter
     note_values = {
         'c': 4.0,
         'o': 0.5,
@@ -482,70 +555,11 @@ def main():
         'w': 1.0
     }
 
-    print('xd')
+    """ Generate MIDI file from notes """
+    music_path = r'./music'
+    generate_midi(song_notes, note_numbers, note_values, music_path)
 
-    # TODO: zrobic slownik nutek i ich ustawien (tych ponizej) np. ze pulnuta ma inne 'duration' itp
-
-    from midiutil import MIDIFile
-    track = 0
-    channel = 0
-    time = 0  # In beats
-    # duration = 1  # In beats
-    tempo = 80  # In BPM
-    volume = 100  # 0-127, as per the MIDI standard
-    for song_name in song_notes:
-        # degrees = [60, 62, 64, 65, 67, 69, 71, 72]  # MIDI note number
-        # print(song_name, song_notes[song_name])
-        degrees = [(note_values[note.value], note_numbers[note.height]) for note in song_notes[song_name]]
-        my_midi = MIDIFile(1)  # One track, defaults to format 1 (tempo track is created automatically)
-        my_midi.addTempo(track, time, tempo)
-        duration_sum = 0
-        for duration, pitch in degrees:
-            my_midi.addNote(track, channel, pitch, duration_sum, duration, volume)
-            duration_sum += duration
-
-        with open(f'{song_name}.mid', "wb") as output_file:
-            my_midi.writeFile(output_file)
-
-    import pygame
-
-    def play_music(music_file):
-        """
-        stream music with mixer.music module in blocking manner
-        this will stream the sound from disk while playing
-        """
-        clock = pygame.time.Clock()
-        try:
-            pygame.mixer.music.load(music_file)
-            print("Music file %s loaded!" % music_file)
-        except pygame.error:
-            print("File %s not found! (%s)" % (music_file, pygame.get_error()))
-            return
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            # check if playback has finished
-            clock.tick(30)
-
-    # pick a midi music file you have ...
-    # (if not in working folder use full path)
-
-    midi_file = r'C:\Users\Radek\PycharmProjects\omr24\major-scale.mid'
-    freq = 44100  # audio CD quality
-    bitsize = -16  # unsigned 16 bit
-    channels = 2  # 1 is mono, 2 is stereo
-    buffer = 1024  # number of samples
-    pygame.mixer.init(freq, bitsize, channels, buffer)
-
-    # optional volume 0 to 1.0
-    pygame.mixer.music.set_volume(0.8)
-    try:
-        play_music(midi_file)
-    except KeyboardInterrupt:
-        # if user hits Ctrl/C then exit
-        # (works only in console mode)
-        pygame.mixer.music.fadeout(1000)
-        pygame.mixer.music.stop()
-        raise SystemExit
+    play_midi()
 
 
 class NoteDetails:
