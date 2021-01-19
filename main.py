@@ -346,7 +346,7 @@ def main():
     dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
 
     # Raw photo extension
-    ext = '.jpg'
+    ext = '.png'
 
     """ Crop all training data sheets """
     # Path with raw train sheets
@@ -390,15 +390,7 @@ def main():
     # How to split files for training / validation
     training_ratio = 0.5
 
-    prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
-
-    """ Train network on the prepared dataset """
-    # python train.py --img 96 --batch 32 --epochs 40 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
-    # python train.py --img 128 --batch 16 --epochs 50 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights yolov5x.pt --name yolo5x_notes --cache --device 0
-    # python train.py --img 128 --batch 16 --epochs 20 --data ./data/moje.yaml --cfg ./models/yolov5x.yaml --weights ./runs/train/yolo5x_notes5/weights/last.pt --name yolo5x_notes --cache --device 0
-
-    """ Export network to OpenCV-friendly format (ONNX) """
-    # python ./models/export.py --weights ./runs/train/yolo5x_notes7/weights/best.pt --img 128 --batch 1
+    # prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
     """ Preprocess user input """
     # Path with raw user sheets
@@ -420,8 +412,32 @@ def main():
 
     # crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
+    """ Prepare YOLOv5 commands """
+    network_type = 'yolov5x'
+    project_name = 'notes'
+    train_img_size = 96
+    batch_size = 256
+    epochs = 500
+    data_config = r'../config/moje.yaml'
+    network_config = f'../config/{network_type}.yaml'
+    network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
+
+    trained_net_path = f'./runs/train/{network_name}/weights/best.pt'
+    detect_img_size = 960
+    confidence = 0.5
+    det_info_path = '../detected'
+
+    """ Train network on the prepared dataset """
+    train_command = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
+
     """ Detect notes on user input using trained network """
-    # python detect.py --weights runs/train/yolo5x_notes5/weights/best.pt --img 1000 --conf 0.7 --source ../staffs
+    detect_command = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project {det_info_path} --name {network_name} --save-txt'
+
+    print(train_command)
+    print(detect_command)
+
+    """ Convert detected notes to MIDI format """
+    # TODO: Wziac z 'det_info_path' info o nutkach i przetworzyc je na MIDI i odtworzyc ten MIDI xd i koniec!!!
 
 
 if __name__ == '__main__':
