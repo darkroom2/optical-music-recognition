@@ -279,45 +279,6 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         shutil.copy(file, note_img)
 
 
-def play_midi():
-    import pygame
-    def play_music(music_file):
-        """
-        stream music with mixer.music module in blocking manner
-        this will stream the sound from disk while playing
-        """
-        clock = pygame.time.Clock()
-        try:
-            pygame.mixer.music.load(music_file)
-            print("Music file %s loaded!" % music_file)
-        except pygame.error:
-            print("File %s not found! (%s)" % (music_file, pygame.get_error()))
-            return
-        pygame.mixer.music.play()
-        while pygame.mixer.music.get_busy():
-            # check if playback has finished
-            clock.tick(30)
-
-    # pick a midi music file you have ...
-    # (if not in working folder use full path)
-    midi_file = r'C:\Users\Radek\PycharmProjects\omr24\major-scale.mid'
-    freq = 44100  # audio CD quality
-    bitsize = -16  # unsigned 16 bit
-    channels = 2  # 1 is mono, 2 is stereo
-    buffer = 1024  # number of samples
-    pygame.mixer.init(freq, bitsize, channels, buffer)
-    # optional volume 0 to 1.0
-    pygame.mixer.music.set_volume(0.8)
-    try:
-        play_music(midi_file)
-    except KeyboardInterrupt:
-        # if user hits Ctrl/C then exit
-        # (works only in console mode)
-        pygame.mixer.music.fadeout(1000)
-        pygame.mixer.music.stop()
-        raise SystemExit
-
-
 def get_song_notes_dict(dict_of_classes, labels_path):
     input_path = Path(labels_path)
     if input_path.is_dir() is not True:
@@ -383,6 +344,45 @@ def generate_midi(song_notes, note_numbers, note_values, music_path):
             my_midi.writeFile(output_file)
 
 
+# def play_midi():
+#     import pygame
+#     def play_music(music_file):
+#         """
+#         stream music with mixer.music module in blocking manner
+#         this will stream the sound from disk while playing
+#         """
+#         clock = pygame.time.Clock()
+#         try:
+#             pygame.mixer.music.load(music_file)
+#             print("Music file %s loaded!" % music_file)
+#         except pygame.error:
+#             print("File %s not found! (%s)" % (music_file, pygame.get_error()))
+#             return
+#         pygame.mixer.music.play()
+#         while pygame.mixer.music.get_busy():
+#             # check if playback has finished
+#             clock.tick(30)
+#
+#     # pick a midi music file you have ...
+#     # (if not in working folder use full path)
+#     midi_file = r'C:\Users\Radek\PycharmProjects\omr24\major-scale.mid'
+#     freq = 44100  # audio CD quality
+#     bitsize = -16  # unsigned 16 bit
+#     channels = 2  # 1 is mono, 2 is stereo
+#     buffer = 1024  # number of samples
+#     pygame.mixer.init(freq, bitsize, channels, buffer)
+#     # optional volume 0 to 1.0
+#     pygame.mixer.music.set_volume(0.8)
+#     try:
+#         play_music(midi_file)
+#     except KeyboardInterrupt:
+#         # if user hits Ctrl/C then exit
+#         # (works only in console mode)
+#         pygame.mixer.music.fadeout(1000)
+#         pygame.mixer.music.stop()
+#         raise SystemExit
+
+
 def main():
     # List of notes included in train data
     train_notes_list = ['c_a', 'c_ais', 'c_b', 'c_h', 'c_c1', 'c_cis1', 'c_des1', 'c_d1', 'c_dis1', 'c_es1', 'c_e1',
@@ -405,7 +405,7 @@ def main():
     dict_of_classes = {i: train_notes_list[i] for i in range(0, len(train_notes_list))}
 
     # Raw photo extension
-    ext = '.png'
+    ext = '.jpg'
 
     """ Crop all training data sheets """
     # Path with raw train sheets
@@ -413,7 +413,7 @@ def main():
     # Path where to store cropped sheets
     cropped_sheets_path = r'./sheets/database/cropped'
 
-    crop_all_sheets(raw_sheets_path, cropped_sheets_path, ext)
+    # crop_all_sheets(raw_sheets_path, cropped_sheets_path, ext)
 
     """ Preprocess sheets before extracting notes from trainig data sheets """
     # Path where to store preprocessed sheets
@@ -423,7 +423,7 @@ def main():
     # How much to crop the borders
     page_margin = 40
 
-    preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
+    # preprocess_sheets(page_height, page_margin, cropped_sheets_path, preprocessed_sheets_path, ext)
 
     """ Crop out staffs from preprocessed sheets """
     # Path where to store the staffs
@@ -431,7 +431,7 @@ def main():
     # How much to crop borders of staff image
     staff_margin = 5
 
-    crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
+    # crop_staffs(staff_margin, preprocessed_sheets_path, staffs_path, ext)
 
     """ Crop notes by vertical tact lines """
     # Path where to store individual notes
@@ -441,7 +441,7 @@ def main():
     # How many notes of each type in training dataset
     each_note_copies = 20
 
-    crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
+    # crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
 
     """ Generate yolo compatible dataset """
     # Path where to store yolo-like database
@@ -449,7 +449,7 @@ def main():
     # How to split files for training / validation
     training_ratio = 0.5
 
-    prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
+    # prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
     """ Preprocess user input """
     # Path with raw user sheets
@@ -457,19 +457,19 @@ def main():
     # Path where to store cropped user sheets
     user_cropped_path = r'./sheets/user/cropped'
 
-    crop_all_sheets(user_raw_path, user_cropped_path, ext)
+    # crop_all_sheets(user_raw_path, user_cropped_path, ext)
 
     """ Preprocess user sheets before extracting staffs from user data sheets """
     # Path where to store preprocessed sheets
     user_preprocessed_path = r'./sheets/user/preprocessed'
 
-    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
+    # preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
     """ Crop out staffs from preprocessed sheets """
     # Path where to store the staffs
     user_staffs_path = r'./sheets/user/staffs'
 
-    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
+    # crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
     """ Prepare parameters for YOLOv5 commands """
     yolov5_proj_dir = r'./yolov5'
@@ -477,7 +477,7 @@ def main():
     project_name = 'notes'
     train_img_size = 96
     batch_size = 256
-    epochs = 300
+    epochs = 500
     data_config = r'../config/moje.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
@@ -493,16 +493,18 @@ def main():
                                                  train_img_size, trained_net_path, user_staffs_path)
 
     """ Train network on the prepared dataset """
-    exec(train_command)
+    # exec(train_command)
+    print(train_command)
 
     """ Detect notes on user input using trained network """
-    exec(detect_command)
+    # exec(detect_command)
+    print(detect_command)
 
     """ Extract notes information after detection """
     # Path where the information is stored
     labels_path = f'./detected/{network_name}/labels'
     # Gets {song_name: notes_list} dictionary
-    song_notes = get_song_notes_dict(dict_of_classes, labels_path)
+    # song_notes = get_song_notes_dict(dict_of_classes, labels_path)
 
     """ Prepare notes parameters """
     # Translates note names to MIDI values
@@ -557,9 +559,10 @@ def main():
 
     """ Generate MIDI file from notes """
     music_path = r'./music'
-    generate_midi(song_notes, note_numbers, note_values, music_path)
 
-    play_midi()
+    # generate_midi(song_notes, note_numbers, note_values, music_path)
+
+    # play_midi()
 
 
 class NoteDetails:
