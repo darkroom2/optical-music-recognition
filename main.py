@@ -340,7 +340,7 @@ def generate_midi(song_notes, note_numbers, note_values, music_path):
             my_midi.addNote(track, channel, pitch, duration_sum, duration, volume)
             duration_sum += duration
 
-        with output_path / f'{song_name}.mid' as output_file:
+        with (output_path / f'{song_name}.mid').open('wb') as output_file:
             my_midi.writeFile(output_file)
 
 
@@ -488,13 +488,13 @@ def main():
     det_info_path = '../detected'
 
     """ Generate yolo train and detect command """
-    detect_command, train_command = get_commands(yolov5_proj_dir, batch_size, confidence, data_config, det_info_path,
+    train_command, detect_command = get_commands(yolov5_proj_dir, batch_size, confidence, data_config, det_info_path,
                                                  detect_img_size, epochs, network_config, network_name, network_type,
                                                  train_img_size, trained_net_path, user_staffs_path)
 
     """ Train network on the prepared dataset """
     # exec(train_command)
-    print(train_command)
+    # print(train_command)
 
     """ Detect notes on user input using trained network """
     # exec(detect_command)
@@ -504,7 +504,7 @@ def main():
     # Path where the information is stored
     labels_path = f'./detected/{network_name}/labels'
     # Gets {song_name: notes_list} dictionary
-    # song_notes = get_song_notes_dict(dict_of_classes, labels_path)
+    song_notes = get_song_notes_dict(dict_of_classes, labels_path)
 
     """ Prepare notes parameters """
     # Translates note names to MIDI values
@@ -560,7 +560,7 @@ def main():
     """ Generate MIDI file from notes """
     music_path = r'./music'
 
-    # generate_midi(song_notes, note_numbers, note_values, music_path)
+    generate_midi(song_notes, note_numbers, note_values, music_path)
 
     # play_midi()
 
