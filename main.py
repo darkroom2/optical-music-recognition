@@ -277,7 +277,7 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
 
         note_txt = folder_label / (file.stem + '.txt')
 
-        with open(str(note_txt), 'w+') as pos_file:
+        with note_txt.open('w+') as pos_file:
             pos_file.write(f'{note_class} {bounds_str}')
 
         note_img = folder_img / file.name
@@ -445,8 +445,8 @@ def main(params):
     network_type = 'yolov5x'
     project_name = 'notes'
     train_img_size = 96
-    batch_size = 4  # 256
-    epochs = 50  # 200
+    batch_size = 256  # 256
+    epochs = 230  # 200
     data_config = r'../config/moje.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
@@ -492,7 +492,7 @@ def main(params):
         # Path where to store yolo-like database
         yolo_dataset_path = r'./yolo_notes'
         # How to split files for training / validation
-        training_ratio = 0.5
+        training_ratio = 0.8
 
         prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
@@ -577,7 +577,7 @@ def main(params):
             'h2': 83,
             'c3': 84
         }
-        # Translates note prefix to MIDI height parameter
+        # Translates note prefix to MIDI value parameter
         note_values = {
             'c': 4.0,
             'o': 0.5,
