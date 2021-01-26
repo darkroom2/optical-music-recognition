@@ -234,7 +234,7 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
     if 1 < train_ratio < 0:
         raise Exception('Split ratio not in (0, 1]')
 
-    ids = list(range(0, 20, 1))
+    ids = list(range(0, each_note_copies, 1))
     np.random.shuffle(ids)
 
     train_notes_count = round(train_ratio * each_note_copies)
@@ -336,7 +336,7 @@ def get_song_notes_dict(dict_of_classes, labels_path):
     return song_notes
 
 
-def generate_midi(song_notes, note_numbers, note_values, music_path):
+def generate_midi(song_notes, note_numbers, note_values, music_path, network_name):
     output_path = Path(music_path)
 
     if output_path.is_dir() is not True:
@@ -349,9 +349,9 @@ def generate_midi(song_notes, note_numbers, note_values, music_path):
     tempo = 80  # In BPM
     volume = 100  # 0-127, as per the MIDI standard
     for song_name in song_notes:
-        midi_file = (output_path / f'{song_name}.mid')
+        midi_file = (output_path / f'{song_name}_{network_name}.mid')
         if midi_file.exists():
-            print(f'Song {song_name} already exist, skipping...')
+            print(f'Song {midi_file.stem} already exist, skipping...')
             continue
         # degrees = [60, 62, 64, 65, 67, 69, 71, 72]  # MIDI note number
         # print(song_name, song_notes[song_name])
@@ -363,7 +363,7 @@ def generate_midi(song_notes, note_numbers, note_values, music_path):
             my_midi.addNote(track, channel, pitch, duration_sum, duration, volume)
             duration_sum += duration
 
-        with (output_path / f'{song_name}.mid').open('wb') as output_file:
+        with midi_file.open('wb') as output_file:
             my_midi.writeFile(output_file)
 
 
@@ -445,8 +445,8 @@ def main(params):
     network_type = 'yolov5x'
     project_name = 'notes'
     train_img_size = 96
-    batch_size = 256  # 256
-    epochs = 300  # 200
+    batch_size = 4  # 256
+    epochs = 50  # 200
     data_config = r'../config/moje.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
@@ -485,12 +485,14 @@ def main(params):
             height_divider = 33
 
             crop_notes(height_divider, each_note_copies, train_notes_list, staffs_path, notes_path, ext)
+        else:
+            print('Notes already cropped, skipping...')
 
         """ Generate yolo compatible dataset """
         # Path where to store yolo-like database
         yolo_dataset_path = r'./yolo_notes'
         # How to split files for training / validation
-        training_ratio = 0.65
+        training_ratio = 0.5
 
         prepare_for_yolo(dict_of_notes, training_ratio, each_note_copies, notes_path, yolo_dataset_path, ext)
 
@@ -586,7 +588,7 @@ def main(params):
         """ Generate MIDI file from notes """
         music_path = r'./music'
 
-        generate_midi(song_notes, note_numbers, note_values, music_path)
+        generate_midi(song_notes, note_numbers, note_values, music_path, network_name)
 
 
 class NoteDetails:
