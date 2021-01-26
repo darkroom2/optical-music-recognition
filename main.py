@@ -10,8 +10,18 @@ from midiutil import MIDIFile
 from more_itertools import consecutive_groups
 
 
-def distance(point1, point2):
-    return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
+def crop_all_sheets(path_in, path_out, ext):
+    input_path = Path(path_in)
+    if input_path.is_dir() is not True:
+        raise Exception('input_path should exist, bad input')
+
+    output_path = Path(path_out)
+    if output_path.is_dir() is not True:
+        output_path.mkdir(parents=True)
+
+    for file in input_path.glob('*' + ext):
+        sheet = transform_and_crop_a4(str(file))
+        cv.imwrite(str(output_path / file.name), sheet)
 
 
 def transform_and_crop_a4(path):
@@ -76,18 +86,8 @@ def transform_and_crop_a4(path):
     return result
 
 
-def crop_all_sheets(path_in, path_out, ext):
-    input_path = Path(path_in)
-    if input_path.is_dir() is not True:
-        raise Exception('input_path should exist, bad input')
-
-    output_path = Path(path_out)
-    if output_path.is_dir() is not True:
-        output_path.mkdir(parents=True)
-
-    for file in input_path.glob('*' + ext):
-        sheet = transform_and_crop_a4(str(file))
-        cv.imwrite(str(output_path / file.name), sheet)
+def distance(point1, point2):
+    return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
 
 def preprocess_sheets(target_height, target_margin, path_in, path_out, ext):
@@ -284,6 +284,25 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         shutil.copy(file, note_img)
 
 
+def exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
+                       yolov5_proj_dir):
+    if Path(f'{yolov5_proj_dir}/runs/train/{network_name}').is_dir():
+        print('Network already trained, skipping...')
+        return
+    else:
+        cmd = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
+        return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
+
+
+def exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path, user_staffs_path,
+                        yolov5_proj_dir):
+    if Path(f'{det_info_path}/{network_name}').is_dir():
+        print('Data already detected, skipping...')
+        return
+    cmd = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project .{det_info_path} --name {network_name} --save-txt --save-conf --device 0'
+    return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
+
+
 def get_song_notes_dict(dict_of_classes, labels_path):
     input_path = Path(labels_path)
     if input_path.is_dir() is not True:
@@ -315,25 +334,6 @@ def get_song_notes_dict(dict_of_classes, labels_path):
         song_notes_list = list(filter(lambda note: song_name == note.song_name, notes))
         song_notes[song_name] = sorted(song_notes_list, key=operator.attrgetter('sheet_number', 'staff_number', 'x'))
     return song_notes
-
-
-def exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path, user_staffs_path,
-                        yolov5_proj_dir):
-    if Path(f'{det_info_path}/{network_name}').is_dir():
-        print('Data already detected, skipping...')
-        return
-    cmd = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project .{det_info_path} --name {network_name} --save-txt --save-conf --device 0'
-    return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
-
-
-def exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
-                       yolov5_proj_dir):
-    if Path(f'{yolov5_proj_dir}/runs/train/{network_name}').is_dir():
-        print('Network already trained, skipping...')
-        return
-    else:
-        cmd = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
-        return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
 
 
 def generate_midi(song_notes, note_numbers, note_values, music_path):
