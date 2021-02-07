@@ -285,21 +285,21 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
 
 
 def exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
-                       yolov5_proj_dir):
+                       yolov5_proj_dir, device):
     if Path(f'{yolov5_proj_dir}/runs/train/{network_name}').is_dir():
         print('Network already trained, skipping...')
         return
     else:
-        cmd = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device 0'
+        cmd = f'python train.py --img {train_img_size} --batch {batch_size} --epochs {epochs} --data {data_config} --cfg {network_config} --weights {network_type}.pt --name {network_name} --cache --device {device}'
         return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
 
 
 def exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path, user_staffs_path,
-                        yolov5_proj_dir):
+                        yolov5_proj_dir, device):
     if Path(f'{det_info_path}/{network_name}').is_dir():
         print('Data already detected, skipping...')
         return
-    cmd = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project .{det_info_path} --name {network_name} --save-txt --save-conf --device 0'
+    cmd = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project .{det_info_path} --name {network_name} --save-txt --save-conf --device {device}'
     return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
 
 
@@ -450,6 +450,9 @@ def main(params):
     data_config = r'../config/moje.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
+    device = 0
+    if params.cpu:
+        device = 'cpu'
 
     trained_net_path = f'./runs/train/{network_name}/weights/best.pt'
     detect_img_size = 960
@@ -498,7 +501,7 @@ def main(params):
 
         """ Train network on the prepared dataset """
         exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
-                           yolov5_proj_dir)
+                           yolov5_proj_dir, device)
 
     # Path where to store the user staffs
     user_staffs_path = r'./sheets/user/staffs'
@@ -526,7 +529,7 @@ def main(params):
     if params.generate:
         """ Detect notes on user input using trained network """
         exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path,
-                            user_staffs_path, yolov5_proj_dir)
+                            user_staffs_path, yolov5_proj_dir, device)
 
         """ Extract notes information after detection """
         # Path where the information is stored
@@ -611,5 +614,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='user', help='Tryb aplikacji user / admin')
     parser.add_argument('--generate', action='store_true', help='Detects & generates music')
-    opt = parser.parse_args(f'--mode admin --generate'.split())
+    parser.add_argument('--cpu', action='store_true', help='Changes device from gpu to cpu')
+    opt = parser.parse_args()
     main(opt)
