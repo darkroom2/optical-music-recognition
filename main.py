@@ -296,10 +296,10 @@ def exec_train_command(batch_size, data_config, epochs, network_config, network_
 
 def exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path, user_staffs_path,
                         yolov5_proj_dir, device):
-    if Path(f'{det_info_path}/{network_name}').is_dir():
-        print('Data already detected, skipping...')
-        return
-    cmd = f'python detect.py --source .{user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project .{det_info_path} --name {network_name} --save-txt --save-conf --device {device}'
+    det_folder = Path(f'{det_info_path}/{network_name}')
+    if det_folder.is_dir():
+        shutil.rmtree(det_folder)
+    cmd = f'python detect.py --source {user_staffs_path} --weights {trained_net_path} --img {detect_img_size} --conf {confidence} --project .{det_info_path} --name {network_name} --save-txt --save-conf --device {device}'
     return subprocess.call(cmd, shell=True, cwd=f'{yolov5_proj_dir}')
 
 
@@ -336,7 +336,7 @@ def get_song_notes_dict(dict_of_classes, labels_path):
     return song_notes
 
 
-def generate_midi(song_notes, note_numbers, note_values, music_path, network_name):
+def generate_midi(song_notes, note_numbers, note_values, tempo, key, music_path, network_name):
     output_path = Path(music_path)
 
     if output_path.is_dir() is not True:
@@ -346,10 +346,9 @@ def generate_midi(song_notes, note_numbers, note_values, music_path, network_nam
     channel = 0
     time = 0  # In beats
     # duration = 1  # In beats
-    tempo = 80  # In BPM
     volume = 100  # 0-127, as per the MIDI standard
     for song_name in song_notes:
-        midi_file = (output_path / f'{song_name}_{network_name}.mid')
+        midi_file = (output_path / f'{song_name}_bpm{tempo}_k{key}_{network_name}.mid')
         if midi_file.exists():
             print(f'Song {midi_file.stem} already exist, skipping...')
             continue
@@ -406,6 +405,39 @@ def generate_midi(song_notes, note_numbers, note_values, music_path, network_nam
 #         raise SystemExit
 
 
+def adjust_to_key(note_numbers, key):
+    notes_key = {
+        'C': (),
+        'G': ('f',),
+        'D': ('f', 'c'),
+        'A': ('f', 'c', 'g'),
+        'E': ('f', 'c', 'g', 'd'),
+        'H': ('f', 'c', 'g', 'd', 'a'),
+        'Fis': ('f', 'c', 'g', 'd', 'a', 'e'),
+        'Cis': ('f', 'c', 'g', 'd', 'a', 'e', 'h'),
+        'F': ('h', 'b'),
+        'B': ('h', 'b', 'e'),
+        'Es': ('h', 'b', 'e', 'a'),
+        'As': ('h', 'b', 'e', 'a', 'd'),
+        'Des': ('h', 'b', 'e', 'a', 'd', 'g'),
+        'Ges': ('h', 'b', 'e', 'a', 'd', 'g', 'c'),
+        'Ces': ('h', 'b', 'e', 'a', 'd', 'g', 'c', 'f')
+    }
+
+    increment_keys = ['G', 'D', 'A', 'E', 'H', 'Fis', 'Cis']
+    # decrement_keys = ['F', 'B', 'Es', 'As', 'Des', 'Ges', 'Ces']
+
+    notes_to_adjust = notes_key[key]
+    for note_hint in notes_to_adjust:
+        notes = [_key for _key, value in note_numbers.items() if note_hint == _key.lower()[0]]
+        if key in increment_keys:
+            for note in notes:
+                note_numbers[note] = note_numbers[note] + 1
+        else:
+            for note in notes:
+                note_numbers[note] = note_numbers[note] - 1
+
+
 def main(params):
     """ Training / detect data parameters preparation """
     # Raw train / detect photos extension
@@ -428,6 +460,7 @@ def main(params):
                         'w_f1', 'w_fis1', 'w_ges1', 'w_g1', 'w_gis1', 'w_as1', 'w_a1', 'w_ais1', 'w_b1', 'w_h1', 'w_c2',
                         'w_cis2', 'w_des2', 'w_d2', 'w_dis2', 'w_es2', 'w_e2', 'w_f2', 'w_fis2', 'w_ges2', 'w_g2',
                         'w_gis2', 'w_as2', 'w_a2', 'w_ais2', 'w_b2', 'w_h2', 'w_c3']
+
     # Helper dictionaries regarding train data
     dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
     dict_of_classes = {i: train_notes_list[i] for i in range(0, len(train_notes_list))}
@@ -503,28 +536,26 @@ def main(params):
         exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
                            yolov5_proj_dir, device)
 
+
+    # Path with raw user sheets
+    user_raw_path = params.path
     # Path where to store the user staffs
-    user_staffs_path = r'./sheets/user/staffs'
+    user_staffs_path = f'{user_raw_path}/../staffs'
 
-    if not Path(user_staffs_path).is_dir():
-        """ Preprocess user input """
-        # Path with raw user sheets
-        user_raw_path = r'./sheets/user/raw'
-        # Path where to store cropped user sheets
-        user_cropped_path = r'./sheets/user/cropped'
+    """ Preprocess user input """
+    # Path where to store cropped user sheets
+    user_cropped_path = f'{user_raw_path}/../cropped'
 
-        crop_all_sheets(user_raw_path, user_cropped_path, ext)
+    crop_all_sheets(user_raw_path, user_cropped_path, ext)
 
-        """ Preprocess user sheets before extracting staffs from user data sheets """
-        # Path where to store preprocessed sheets
-        user_preprocessed_path = r'./sheets/user/preprocessed'
+    """ Preprocess user sheets before extracting staffs from user data sheets """
+    # Path where to store preprocessed sheets
+    user_preprocessed_path = f'{user_raw_path}/../preprocessed'
 
-        preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
+    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
-        """ Crop out staffs from preprocessed sheets """
-        crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
-    else:
-        print('User data already prepared, skipping...')
+    """ Crop out staffs from preprocessed sheets """
+    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
     if params.generate:
         """ Detect notes on user input using trained network """
@@ -580,6 +611,9 @@ def main(params):
             'h2': 83,
             'c3': 84
         }
+        # Fix numbers according to key
+        adjust_to_key(note_numbers, params.key)
+
         # Translates note prefix to MIDI value parameter
         note_values = {
             'c': 4.0,
@@ -591,7 +625,7 @@ def main(params):
         """ Generate MIDI file from notes """
         music_path = r'./music'
 
-        generate_midi(song_notes, note_numbers, note_values, music_path, network_name)
+        generate_midi(song_notes, note_numbers, note_values, params.tempo, params.key, music_path, network_name)
 
 
 class NoteDetails:
@@ -612,8 +646,12 @@ class NoteDetails:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', type=str, default='user', help='Tryb aplikacji user / admin')
+    parser.add_argument('--mode', type=str, default='user', help='User mode or admin mode (admin can train network)')
+    parser.add_argument('--path', type=str, default=r'./sheets/user/raw', help='Path to user image files')
+    parser.add_argument('--tempo', type=int, default=80, help='Tempo in beats per minute')
+    parser.add_argument('--key', type=str, default='C', help='The key of the track')
     parser.add_argument('--generate', action='store_true', help='Detects & generates music')
     parser.add_argument('--cpu', action='store_true', help='Changes device from gpu to cpu')
+    # opt = parser.parse_args('--mode user --generate --cpu --key A --tempo 200'.split())
     opt = parser.parse_args()
     main(opt)
