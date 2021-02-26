@@ -30,11 +30,12 @@ Dla administratora (możliwość samodzielnego uczenia sieci i zmiany parametró
 python main.py [-h] [--mode MODE] [--path PATH] [--tempo TEMPO] [--key KEY] [--generate] [--cpu]
 ```
 
-optional arguments:
-  ```sh-h, --help```     Show this help message and exit
-  ```sh--mode MODE```    User mode or admin mode (admin can train network)
-  ```sh--path PATH```    Path to user image files
-  ```sh--tempo TEMPO```  Tempo in beats per minute
-  ```sh--key KEY```      The key of the track
-  ```sh--generate```     Detects & generates music
-  ```sh--cpu```          Changes device from gpu to cpu
+optional arguments:\
+  ```sh-h, --help```     Show this help message and exit\
+  ```sh--mode MODE```    User mode or admin mode (admin can train network)\
+  ```sh--path PATH```    Path to user image files\
+  ```sh--tempo TEMPO```  Tempo in beats per minute\
+  ```sh--key KEY```      The key of the track\
+  ```sh--generate```     Detects & generates music\
+  ```sh--cpu```          Changes device from gpu to cpu\
+  
