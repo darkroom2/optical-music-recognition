@@ -5,7 +5,8 @@ Aplikacja odtwarzająca melodię na podstawie rozpoznanych na zdjęciu nut muzyc
 Wymagane:
 -----
 
-* [Python](https://www.python.org/) >= 3.8.0
+* [Python](https://www.python.org) >= 3.8.0
+* [YOLOv5](https://github.com/ultralytics/yolov5)
 
 Instalacja:
 ---
