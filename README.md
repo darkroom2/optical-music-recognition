@@ -37,5 +37,5 @@ optional arguments:\
   ```--tempo TEMPO```  Tempo in beats per minute\
   ```--key KEY```      The key of the track\
   ```--generate```     Detects & generates music\
-  ```--cpu```          Changes device from gpu to cpu\
+  ```--cpu```          Changes device from gpu to cpu
   
