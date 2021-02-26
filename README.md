@@ -40,3 +40,7 @@ optional arguments:\
   ```--generate```     Detects & generates music\
   ```--cpu```          Changes device from gpu to cpu
   
+Działanie:
+---
+
+![Prezentacja działania](https://youtu.be/qjuRwqIHdXc)
