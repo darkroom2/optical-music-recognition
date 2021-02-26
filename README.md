@@ -31,11 +31,11 @@ python main.py [-h] [--mode MODE] [--path PATH] [--tempo TEMPO] [--key KEY] [--g
 ```
 
 optional arguments:\
-  ```sh -h, --help```     Show this help message and exit\
-  ```sh --mode MODE```    User mode or admin mode (admin can train network)\
-  ```sh --path PATH```    Path to user image files\
-  ```sh --tempo TEMPO```  Tempo in beats per minute\
-  ```sh --key KEY```      The key of the track\
-  ```sh --generate```     Detects & generates music\
-  ```sh --cpu```          Changes device from gpu to cpu\
+  ```-h, --help```     Show this help message and exit\
+  ```--mode MODE```    User mode or admin mode (admin can train network)\
+  ```--path PATH```    Path to user image files\
+  ```--tempo TEMPO```  Tempo in beats per minute\
+  ```--key KEY```      The key of the track\
+  ```--generate```     Detects & generates music\
+  ```--cpu```          Changes device from gpu to cpu\
   
