@@ -42,5 +42,4 @@ optional arguments:\
   
 Działanie:
 ---
-
-![Prezentacja działania](https://youtu.be/qjuRwqIHdXc)
+[![OMR in action](https://img.youtube.com/vi/qjuRwqIHdXc/0.jpg)](https://www.youtube.com/watch?v=qjuRwqIHdXc)
