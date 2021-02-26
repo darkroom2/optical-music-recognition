@@ -38,4 +38,3 @@ optional arguments:
   ```sh--key KEY```      The key of the track
   ```sh--generate```     Detects & generates music
   ```sh--cpu```          Changes device from gpu to cpu
-```
