@@ -7,6 +7,19 @@ import pygame
 from PIL import Image
 
 
+def update_network_list(network_path, window):
+    # Get list of files in folder
+    input_path = Path(network_path)
+    if input_path.is_dir():
+        fnames = [
+            f.name for f in input_path.iterdir()
+        ]
+
+        fnames = sorted(fnames, key=lambda x: int(x.split('_')[3][1:]), reverse=True)
+
+        window['-NETWORK-'].update(value=fnames[0], values=fnames)
+
+
 def gui():
     # First the window layout in 2 columns
     file_list_column = [
@@ -19,6 +32,13 @@ def gui():
             sg.Listbox(
                 values=[], enable_events=True, size=(75, 20), key="-FILE LIST-"
             )
+        ],
+    ]
+
+    parameters_column = [
+        [
+            sg.Text("Key"),
+            sg.Combo(values=[], key='-NETWORK-'),
         ],
         [
             sg.Text('Tempo'),
@@ -53,7 +73,7 @@ def gui():
             sg.Column(image_viewer_column),
         ],
         [
-            sg.HSeparator(),
+            sg.Column(parameters_column)
         ],
         [
             sg.Column([
@@ -67,6 +87,11 @@ def gui():
 
     # Create main window
     window = sg.Window("Optical Music Recognition", layout, finalize=True)
+
+    # Default network path
+    network_path = r'./yolov5/runs/train'
+    # Preload network names combolist
+    update_network_list(network_path, window)
 
     # Default music path
     music_path = r'./music'
@@ -105,7 +130,7 @@ def gui():
                 filename = Path(values['-FOLDER-']) / values["-FILE LIST-"][0]
                 with BytesIO() as f:
                     im = Image.open(filename)
-                    im.thumbnail((400, 400), Image.ANTIALIAS)
+                    im.thumbnail((370, 370), Image.ANTIALIAS)
                     im.save(f, format='PNG')
                     window["-IMAGE-"].update(data=f.getvalue())
             except IndexError:
@@ -117,6 +142,7 @@ def gui():
             generate = values['-GENERATE-']
             cpu = values['-CPU-']
             input_path = values['-FOLDER-']
+            network_name = values['-NETWORK-']
 
             if Path(input_path).is_dir():
 
@@ -130,6 +156,11 @@ def gui():
                     generate = '--generate'
                 else:
                     generate = ''
+
+                if network_name:
+                    network_name = f'--weights {network_name}'
+                else:
+                    network_name = ''
 
                 if cpu:
                     cpu = '--cpu'
@@ -146,7 +177,7 @@ def gui():
                 else:
                     tempo = ''
 
-                cmd = f'python main.py {input_path} --mode user {generate} {cpu} {key} {tempo}'
+                cmd = f'python main.py {input_path} --mode user {generate} {cpu} {key} {tempo} {network_name}'
 
                 fail = False
                 try:
