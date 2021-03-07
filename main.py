@@ -221,6 +221,9 @@ def crop_notes(divider_param, max_notes, train_notes_list, path_in, path_out, ex
                     note_count += 1
 
 
+def clamp(n, smallest, largest): return max(smallest, min(n, largest))
+
+
 def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, yolo_dataset_path, ext):
     input_path = Path(notes_path)
     output_path = Path(yolo_dataset_path)
@@ -269,9 +272,15 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         note_class = dict_of_notes[name]
 
         note = cv.imread(str(file), cv.IMREAD_GRAYSCALE)
+
+        # rows, columns
         img_h, img_w = note.shape[:2]
         threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY)[1]
         x, y, w, h = cv.boundingRect(threshed)
+
+        y = clamp(y-10, 0, y)
+        h = clamp(h + 20, h, img_h)
+
         x_cnt = x + w / 2
         y_cnt = y + h / 2
         norm_bounds = [x_cnt / img_w, y_cnt / img_h, w / img_w, h / img_h]
@@ -500,6 +509,9 @@ def main(params):
     if params.cpu:
         device = 'cpu'
 
+    if params.weights:
+        network_name = params.weights
+
     trained_net_path = f'./runs/train/{network_name}/weights/best.pt'
     detect_img_size = 960
     confidence = 0.5
@@ -661,6 +673,7 @@ class NoteDetails:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='user', help='User mode or admin mode (admin can train network)')
+    parser.add_argument('--weights', type=str, default='', help='Network name to use for detecting')
     parser.add_argument('--path', type=str, default=r'./sheets/user/raw', help='Path to user image files')
     parser.add_argument('--tempo', type=int, default=80, help='Tempo in beats per minute')
     parser.add_argument('--key', type=str, default='C', help='The key of the track')
