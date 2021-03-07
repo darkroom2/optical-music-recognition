@@ -478,7 +478,7 @@ def main(params):
     dict_of_notes = {train_notes_list[i]: i for i in range(0, len(train_notes_list))}
     dict_of_classes = {i: train_notes_list[i] for i in range(0, len(train_notes_list))}
 
-    """ # Training / detect data parameters preparation """
+    """ Training / detect data parameters preparation """
     # What height to resize the page to
     page_height = 1600
     # How much to crop the borders of the input photo
@@ -493,7 +493,7 @@ def main(params):
     train_img_size = 96
     batch_size = 16  # 256
     epochs = 300  # 200
-    data_config = r'../config/moje.yaml'
+    data_config = r'../config/my_config.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
     device = 0
@@ -550,12 +550,9 @@ def main(params):
                            yolov5_proj_dir, device)
 
     if params.mode == 'user':
+        """ Preprocess user input """
         # Path with raw user sheets
         user_raw_path = params.path
-        # Path where to store the user staffs
-        user_staffs_path = f'{user_raw_path}/../staffs'
-
-        """ Preprocess user input """
         # Path where to store cropped user sheets
         user_cropped_path = f'{user_raw_path}/../cropped'
 
@@ -568,6 +565,9 @@ def main(params):
         preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
         """ Crop out staffs from preprocessed sheets """
+        # Path where to store the user staffs
+        user_staffs_path = f'{user_raw_path}/../staffs'
+
         crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
         if params.generate:
@@ -624,6 +624,7 @@ def main(params):
                 'h2': 83,
                 'c3': 84
             }
+
             # Fix numbers according to key
             adjust_to_key(note_numbers, params.key)
 
