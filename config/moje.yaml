@@ -1,7 +1,7 @@
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
 train: ../yolo_notes/images/train  # 128 images
 val: ../yolo_notes/images/validate  # 128 images
-# test: C:/Users/Radek/PycharmProjects/train_model_notes/yolo_dataset/images/test
+test: ../yolo_notes/images/test
 
 # number of classes
 nc: 156

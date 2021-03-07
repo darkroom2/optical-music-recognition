@@ -225,6 +225,8 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
     input_path = Path(notes_path)
     output_path = Path(yolo_dataset_path)
 
+    test_notes_count = 2
+
     if input_path.is_dir() is not True:
         raise Exception('input_path should exist, bad input')
     elif output_path.is_dir():
@@ -234,22 +236,30 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
     if 1 < train_ratio < 0:
         raise Exception('Split ratio not in (0, 1]')
 
-    ids = list(range(0, each_note_copies, 1))
-    np.random.shuffle(ids)
+    # ids = list(range(0, each_note_copies, 1))
+    # np.random.shuffle(ids)
 
-    train_notes_count = round(train_ratio * each_note_copies)
+    # For testing purposes... (uncomment lines above after testing)
+    ids = [14, 17, 7, 11, 0, 4, 15, 12, 9, 16, 3, 1, 10, 2, 18, 5, 6, 13, 19, 8]
+
+    train_notes_count = round(train_ratio * each_note_copies) - test_notes_count
 
     train_set = ids[:train_notes_count]
+    test_set = ids[-test_notes_count:]
 
     train_img_path = output_path / 'images' / 'train'
     validate_img_path = output_path / 'images' / 'validate'
+    test_img_path = output_path / 'images' / 'test'
     train_labels_path = output_path / 'labels' / 'train'
     validate_labels_path = output_path / 'labels' / 'validate'
+    test_labels_path = output_path / 'labels' / 'test'
     if output_path.is_dir() is not True:
         train_img_path.mkdir(parents=True)
         validate_img_path.mkdir()
+        test_img_path.mkdir()
         train_labels_path.mkdir(parents=True)
         validate_labels_path.mkdir()
+        test_labels_path.mkdir()
 
     # generate txt file with bboxes of the objects for each photo
     for file in input_path.glob('*' + ext):
@@ -271,6 +281,9 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         if int(_id) in train_set:
             folder_img = train_img_path
             folder_label = train_labels_path
+        elif int(_id) in test_set:
+            folder_img = test_img_path
+            folder_label = test_labels_path
         else:
             folder_img = validate_img_path
             folder_label = validate_labels_path
@@ -478,8 +491,8 @@ def main(params):
     network_type = 'yolov5x'
     project_name = 'notes'
     train_img_size = 96
-    batch_size = 256  # 256
-    epochs = 230  # 200
+    batch_size = 16  # 256
+    epochs = 300  # 200
     data_config = r'../config/moje.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
@@ -536,96 +549,96 @@ def main(params):
         exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
                            yolov5_proj_dir, device)
 
+    if params.mode == 'user':
+        # Path with raw user sheets
+        user_raw_path = params.path
+        # Path where to store the user staffs
+        user_staffs_path = f'{user_raw_path}/../staffs'
 
-    # Path with raw user sheets
-    user_raw_path = params.path
-    # Path where to store the user staffs
-    user_staffs_path = f'{user_raw_path}/../staffs'
+        """ Preprocess user input """
+        # Path where to store cropped user sheets
+        user_cropped_path = f'{user_raw_path}/../cropped'
 
-    """ Preprocess user input """
-    # Path where to store cropped user sheets
-    user_cropped_path = f'{user_raw_path}/../cropped'
+        crop_all_sheets(user_raw_path, user_cropped_path, ext)
 
-    crop_all_sheets(user_raw_path, user_cropped_path, ext)
+        """ Preprocess user sheets before extracting staffs from user data sheets """
+        # Path where to store preprocessed sheets
+        user_preprocessed_path = f'{user_raw_path}/../preprocessed'
 
-    """ Preprocess user sheets before extracting staffs from user data sheets """
-    # Path where to store preprocessed sheets
-    user_preprocessed_path = f'{user_raw_path}/../preprocessed'
+        preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
 
-    preprocess_sheets(page_height, page_margin, user_cropped_path, user_preprocessed_path, ext)
+        """ Crop out staffs from preprocessed sheets """
+        crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
 
-    """ Crop out staffs from preprocessed sheets """
-    crop_staffs(staff_margin, user_preprocessed_path, user_staffs_path, ext)
+        if params.generate:
+            """ Detect notes on user input using trained network """
+            exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path,
+                                user_staffs_path, yolov5_proj_dir, device)
 
-    if params.generate:
-        """ Detect notes on user input using trained network """
-        exec_detect_command(confidence, det_info_path, detect_img_size, network_name, trained_net_path,
-                            user_staffs_path, yolov5_proj_dir, device)
+            """ Extract notes information after detection """
+            # Path where the information is stored
+            labels_path = f'./detected/{network_name}/labels'
+            # Gets {song_name: notes_list} dictionary
+            song_notes = get_song_notes_dict(dict_of_classes, labels_path)
 
-        """ Extract notes information after detection """
-        # Path where the information is stored
-        labels_path = f'./detected/{network_name}/labels'
-        # Gets {song_name: notes_list} dictionary
-        song_notes = get_song_notes_dict(dict_of_classes, labels_path)
+            """ Prepare notes parameters """
+            # Translates note names to MIDI values
+            note_numbers = {
+                'a': 57,
+                'ais': 58,
+                'b': 58,
+                'h': 59,
+                'c1': 60,
+                'cis1': 61,
+                'des1': 61,
+                'd1': 62,
+                'dis1': 63,
+                'es1': 63,
+                'e1': 64,
+                'f1': 65,
+                'fis1': 66,
+                'ges1': 66,
+                'g1': 67,
+                'gis1': 68,
+                'as1': 68,
+                'a1': 69,
+                'ais1': 70,
+                'b1': 70,
+                'h1': 71,
+                'c2': 72,
+                'cis2': 73,
+                'des2': 73,
+                'd2': 74,
+                'dis2': 75,
+                'es2': 75,
+                'e2': 76,
+                'f2': 77,
+                'fis2': 78,
+                'ges2': 78,
+                'g2': 79,
+                'gis2': 80,
+                'as2': 80,
+                'a2': 81,
+                'ais2': 82,
+                'b2': 82,
+                'h2': 83,
+                'c3': 84
+            }
+            # Fix numbers according to key
+            adjust_to_key(note_numbers, params.key)
 
-        """ Prepare notes parameters """
-        # Translates note names to MIDI values
-        note_numbers = {
-            'a': 57,
-            'ais': 58,
-            'b': 58,
-            'h': 59,
-            'c1': 60,
-            'cis1': 61,
-            'des1': 61,
-            'd1': 62,
-            'dis1': 63,
-            'es1': 63,
-            'e1': 64,
-            'f1': 65,
-            'fis1': 66,
-            'ges1': 66,
-            'g1': 67,
-            'gis1': 68,
-            'as1': 68,
-            'a1': 69,
-            'ais1': 70,
-            'b1': 70,
-            'h1': 71,
-            'c2': 72,
-            'cis2': 73,
-            'des2': 73,
-            'd2': 74,
-            'dis2': 75,
-            'es2': 75,
-            'e2': 76,
-            'f2': 77,
-            'fis2': 78,
-            'ges2': 78,
-            'g2': 79,
-            'gis2': 80,
-            'as2': 80,
-            'a2': 81,
-            'ais2': 82,
-            'b2': 82,
-            'h2': 83,
-            'c3': 84
-        }
-        # Fix numbers according to key
-        adjust_to_key(note_numbers, params.key)
+            # Translates note prefix to MIDI value parameter
+            note_values = {
+                'c': 4.0,
+                'o': 0.5,
+                'p': 2.0,
+                'w': 1.0
+            }
 
-        # Translates note prefix to MIDI value parameter
-        note_values = {
-            'c': 4.0,
-            'o': 0.5,
-            'p': 2.0,
-            'w': 1.0
-        }
+            """ Generate MIDI file from notes """
+            music_path = r'./music'
 
-        """ Generate MIDI file from notes """
-        music_path = r'./music'
-
-        generate_midi(song_notes, note_numbers, note_values, params.tempo, params.key, music_path, network_name)
+            generate_midi(song_notes, note_numbers, note_values, params.tempo, params.key, music_path, network_name)
 
 
 class NoteDetails:
@@ -652,6 +665,6 @@ if __name__ == '__main__':
     parser.add_argument('--key', type=str, default='C', help='The key of the track')
     parser.add_argument('--generate', action='store_true', help='Detects & generates music')
     parser.add_argument('--cpu', action='store_true', help='Changes device from gpu to cpu')
-    # opt = parser.parse_args('--mode user --generate --cpu --key A --tempo 200'.split())
-    opt = parser.parse_args()
+    opt = parser.parse_args('--mode admin'.split())
+    # opt = parser.parse_args()
     main(opt)
