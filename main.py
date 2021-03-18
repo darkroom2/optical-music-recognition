@@ -243,7 +243,7 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
     # np.random.shuffle(ids)
 
     # For testing purposes... (uncomment lines above after testing)
-    ids = [14, 17, 7, 11, 0, 4, 15, 12, 9, 16, 3, 1, 10, 2, 18, 5, 6, 13, 19, 8]
+    ids = [9, 5, 6, 1, 7, 10, 3, 8, 11, 18, 2, 15, 0, 13, 12, 14, 4, 19, 17, 16]
 
     train_notes_count = round(train_ratio * each_note_copies) - test_notes_count
 
@@ -500,8 +500,8 @@ def main(params):
     network_type = 'yolov5x'
     project_name = 'notes'
     train_img_size = 96
-    batch_size = 16  # 256
-    epochs = 300  # 200
+    batch_size = opt.params[0]  # 273
+    epochs = opt.params[1]  # 300
     data_config = r'../config/my_config.yaml'
     network_config = f'../config/{network_type}.yaml'
     network_name = f'{network_type}_{project_name}_s{train_img_size}_b{batch_size}_e{epochs}'
@@ -672,13 +672,15 @@ class NoteDetails:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--mode', type=str, default='user', help='User mode or admin mode (admin can train network)')
+    # TODO: mode admin takes list of parameters to set conf, batch size, epochs etc.
+    parser.add_argument('--mode', type=str, default='user', help='User/admin/test mode or admin mode (admin can train network)')
+    parser.add_argument('--params', nargs='+', type=int, default=[273, 300], help='If mode admin, specify parameters in order batch, epochs')
     parser.add_argument('--weights', type=str, default='', help='Network name to use for detecting')
     parser.add_argument('--path', type=str, default=r'./sheets/user/raw', help='Path to user image files')
     parser.add_argument('--tempo', type=int, default=80, help='Tempo in beats per minute')
     parser.add_argument('--key', type=str, default='C', help='The key of the track')
     parser.add_argument('--generate', action='store_true', help='Detects & generates music')
     parser.add_argument('--cpu', action='store_true', help='Changes device from gpu to cpu')
-    opt = parser.parse_args('--mode admin'.split())
-    # opt = parser.parse_args()
+    # opt = parser.parse_args('--mode admin'.split())
+    opt = parser.parse_args()
     main(opt)
