@@ -4,20 +4,8 @@ from time import sleep, perf_counter
 
 import cv2 as cv
 
-# TODO: KARO przygotowac nuty do testow
-# TODO: Z - zdjecie, S - screen
-# TODO: wlazl_kotek_na_plotek           S,
-#       wlazl_kotek_na_plotek_2         S,
-#       soviet_anthem                   X,
-#       toss_a_coin_to_your_witcher     X,
-#       remember_me                     X,
-#       remember_me                     X,
-#       remember_me                     X,
-#       remember_me                     X,
-#       remember_me                     X,
-# TODO: Zrobic screena jak i zdjecie i wrzucic do raw i dac dobrom nazwe
-# TODO: Napisac skrypt testujacy i porownujacy wektory nut
-# TODO: Sprawdzic jak dziala test.py od yolov5
+# TODO: Zrobic zdjecie i wrzucic do raw i dac dobrom nazwe
+# TODO: Napisac skrypt testujacy i porownujacy wektory nut (konwert dict piosenek na liste zwykla i porownaj)
 
 
 def main():
