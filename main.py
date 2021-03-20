@@ -146,10 +146,10 @@ def crop_staffs(target_margin, path_in, path_out, ext):
             staff = preprocessed_sheet[staff_range[0] - target_margin:staff_range[-1] + target_margin, :]
             threshed = cv.threshold(staff, 127, 255, cv.THRESH_BINARY)[1]
             x, y, w, h = cv.boundingRect(threshed)
-            key_margin = target_margin * 10
-            key_cropped = threshed[y:y + h, x + key_margin:x + w]
-            x, y, w, h = cv.boundingRect(key_cropped)
-            bound_cropped = key_cropped[y:y + h, x:x + w]
+            # key_margin = target_margin * 10
+            # key_cropped = threshed[y:y + h, x + key_margin:x + w]
+            # x, y, w, h = cv.boundingRect(key_cropped)
+            bound_cropped = threshed[y:y + h, x:x + w]
             cv.imwrite(str(output_path / (file.stem + '_' + str(i).zfill(2) + ext)), bound_cropped)
 
 
@@ -278,8 +278,8 @@ def prepare_for_yolo(dict_of_notes, train_ratio, each_note_copies, notes_path, y
         threshed = cv.threshold(note, 127, 255, cv.THRESH_BINARY)[1]
         x, y, w, h = cv.boundingRect(threshed)
 
-        y = clamp(y-10, 0, y)
-        h = clamp(h + 20, h, img_h)
+        y = clamp(y - 3, 0, y)
+        h = clamp(h + 6, h, img_h)
 
         x_cnt = x + w / 2
         y_cnt = y + h / 2
@@ -463,7 +463,7 @@ def adjust_to_key(note_numbers, key):
 def main(params):
     """ Training / detect data parameters preparation """
     # Raw train / detect photos extension
-    ext = '.jpg'
+    ext = '.png'
     # How many notes of each type in training dataset
     each_note_copies = 20
     # List of notes included in train data
@@ -560,8 +560,9 @@ def main(params):
         """ Train network on the prepared dataset """
         exec_train_command(batch_size, data_config, epochs, network_config, network_name, network_type, train_img_size,
                            yolov5_proj_dir, device)
+        return 0
 
-    if params.mode == 'user':
+    elif params.mode == 'user':
         """ Preprocess user input """
         # Path with raw user sheets
         user_raw_path = params.path
@@ -652,7 +653,21 @@ def main(params):
             music_path = r'./music'
 
             generate_midi(song_notes, note_numbers, note_values, params.tempo, params.key, music_path, network_name)
+        return 0
 
+    elif params.mode == 'test':
+        """ Extract notes information after detection """
+        # Path where the information is stored
+        labels_path = f'./detected/{network_name}/labels'
+        # Gets {song_name: notes_list} dictionary
+        song_notes = get_song_notes_dict(dict_of_classes, labels_path)
+
+        # print(json.dumps(song_notes))
+
+        return 0
+
+    else:
+        return -1
 
 class NoteDetails:
     def __init__(self, cls, value, height, x, y, conf, song_name, sheet_number, staff_number):
@@ -672,15 +687,17 @@ class NoteDetails:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # TODO: mode admin takes list of parameters to set conf, batch size, epochs etc.
-    parser.add_argument('--mode', type=str, default='user', help='User/admin/test mode or admin mode (admin can train network)')
-    parser.add_argument('--params', nargs='+', type=int, default=[273, 300], help='If mode admin, specify parameters in order batch, epochs')
+    parser.add_argument('--mode', type=str, default='user',
+                        help='User/admin/test mode or admin mode (admin can train network)')
+    parser.add_argument('--params', nargs='+', type=int, default=[273, 300],
+                        help='If mode admin, specify parameters in order batch, epochs')
     parser.add_argument('--weights', type=str, default='', help='Network name to use for detecting')
     parser.add_argument('--path', type=str, default=r'./sheets/user/raw', help='Path to user image files')
     parser.add_argument('--tempo', type=int, default=80, help='Tempo in beats per minute')
     parser.add_argument('--key', type=str, default='C', help='The key of the track')
     parser.add_argument('--generate', action='store_true', help='Detects & generates music')
     parser.add_argument('--cpu', action='store_true', help='Changes device from gpu to cpu')
+    opt = parser.parse_args('--mode test'.split())
     # opt = parser.parse_args('--mode admin'.split())
-    opt = parser.parse_args()
+    # opt = parser.parse_args()
     main(opt)

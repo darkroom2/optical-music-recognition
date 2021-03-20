@@ -22,8 +22,8 @@ import cv2 as cv
 
 def main():
     cmds = [
-        # 'python train.py --img 96 --batch 273 --epochs 300 --data ../config/my_config.yaml --cfg ../config/yolov5x.yaml --weights yolov5x.pt --name yolov5x_notes_s96_b273_e300 --cache --device 0',
-        # 'python train.py --img 96 --batch 256 --epochs 300 --data ../config/my_config.yaml --cfg ../config/yolov5x.yaml --weights yolov5x.pt --name yolov5x_notes_s96_b256_e300 --cache --device 0',
+        'python train.py --img 96 --batch 273 --epochs 300 --data ../config/my_config.yaml --cfg ../config/yolov5x.yaml --weights yolov5x.pt --name yolov5x_notes_s96_b273_e300 --cache --device 0',
+        'python train.py --img 96 --batch 256 --epochs 300 --data ../config/my_config.yaml --cfg ../config/yolov5x.yaml --weights yolov5x.pt --name yolov5x_notes_s96_b256_e300 --cache --device 0',
     ]
 
     for cmd in cmds:
@@ -63,5 +63,5 @@ def draw_notes():
 
 
 if __name__ == '__main__':
-    main()
-    # draw_notes()
+    # main()
+    draw_notes()
