@@ -1,4 +1,4 @@
-# omr2 - Optical Music Recognition
+# Optical Music Recognition
 
 Aplikacja odtwarzająca melodię na podstawie rozpoznanych na zdjęciu nut muzycznych.
 
